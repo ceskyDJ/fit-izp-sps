@@ -50,6 +50,18 @@ int main(int argc, char **argv) {
         delimiters = (char **) &DELIMITER;
     }
 
+    // Get commands from arguments
+    // TODO: Implement this...
+    skippedArgs += 1;
+
+    // Get file from arguments
+    FILE *inputFile;
+    if ((inputFile = fopen(argv[skippedArgs], "r+")) == NULL) {
+        writeErrorMessage("Soubor predany ve vstupnich argumentech se nepodarilo otevrit.");
+
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
 
