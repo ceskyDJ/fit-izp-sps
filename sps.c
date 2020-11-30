@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     }
 
     // Get delimiter from arguments
-    int skippedArgs = 1;
+    unsigned int skippedArgs = 1;
     char **delimiters;
     if (argc == 5 && streq(argv[skippedArgs], "-d")) {
         delimiters = &argv[skippedArgs + 1];
