@@ -22,6 +22,34 @@
  */
 #define streq(first, second) (strcmp(first, second) == 0)
 
+/**
+ * Individual table cell
+ * @field data Cell's content
+ * @field size Size of the cell's content
+ */
+typedef struct cell {
+    char *data;
+    int size;
+} Cell;
+/**
+ * Individual table row
+ * @field cells Cells in the row
+ * @field size Number of cells in the row
+ */
+typedef struct row {
+    Cell *cells;
+    int size;
+} Row;
+/**
+ * The whole table
+ * @field rows Rows in the table
+ * @field size Number of rows in the table
+ */
+typedef struct table {
+    Row *rows;
+    int size;
+} Table;
+
 // Input/output functions
 void writeErrorMessage(const char *message);
 
