@@ -94,7 +94,7 @@ char *getCellValue(Table *table, unsigned int row, unsigned int column);
  * @return Exit code
  */
 int main(int argc, char **argv) {
-    ErrorInfo err = {.error = false};
+    ErrorInfo err;
 
     /* ARGUMENTS PARSING */
     // Valid arguments: ./sps [-d DELIMITERS] <CMD_SEQUENCE> <FILE>
@@ -320,6 +320,22 @@ ErrorInfo deleteCellFromTable(Table *table, unsigned int position) {
  * @return Error information
  */
 ErrorInfo alignRowSizes(Table *table) {
+    ErrorInfo err = {.error = false};
+
+    // TODO: implement the function...
+
+    return err;
+}
+
+/**
+ * Resizes the table to a new size
+ * <strong>Warning! The table must be already aligned using alignRowSizes()</strong>
+ * @param table Table to resize
+ * @param rows New number of rows
+ * @param columns New number of columns
+ * @return Error information
+ */
+ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
     ErrorInfo err = {.error = false};
 
     // TODO: implement the function...
