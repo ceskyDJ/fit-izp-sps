@@ -7,6 +7,7 @@ cmake-build-debug/
 # Test input and output files
 input.txt
 output.txt
+tmp.txt
 
 # C test files
 test.c
