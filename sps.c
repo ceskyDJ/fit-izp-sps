@@ -87,6 +87,12 @@ ErrorInfo alignRowSizes(Table *table);
 ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, const char *newValue);
 char *getCellValue(Table *table, unsigned int row, unsigned int column);
 
+/**
+ * The main function
+ * @param argc Number of input arguments
+ * @param argv Input arguments "array"
+ * @return Exit code
+ */
 int main(int argc, char **argv) {
     ErrorInfo err = {.error = false};
 
