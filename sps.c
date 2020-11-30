@@ -65,9 +65,9 @@ typedef struct table {
 } Table;
 
 // Input/output functions
-ErrorInfo loadTableFromFile(Table * table, char *file);
-ErrorInfo loadRowFromFile(Row *row, char *file);
-ErrorInfo loadCellFromFile(Cell *cell, char *file);
+ErrorInfo loadTableFromFile(Table * table, const char *file);
+ErrorInfo loadRowFromFile(Row *row, const char *file);
+ErrorInfo loadCellFromFile(Cell *cell, const char *file);
 void writeErrorMessage(const char *message);
 
 int main(int argc, char **argv) {
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
  * @param file The file with data for table
  * @return Error information
  */
-ErrorInfo loadTableFromFile(Table *table, char *file) {
+ErrorInfo loadTableFromFile(Table *table, const char *file) {
     ErrorInfo err = {.error = false};
 
     return err;
@@ -133,7 +133,7 @@ ErrorInfo loadTableFromFile(Table *table, char *file) {
  * @param file The file with data for the row
  * @return Error information or special state for the last row in the table
  */
-ErrorInfo loadRowFromFile(Row *row, char *file) {
+ErrorInfo loadRowFromFile(Row *row, const char *file) {
     ErrorInfo err = {.error = false};
 
     return err;
@@ -145,7 +145,7 @@ ErrorInfo loadRowFromFile(Row *row, char *file) {
  * @param file The file with data for the row
  * @return Error information or special state for the last cell in the row
  */
-ErrorInfo loadCellFromFile(Cell *cell, char *file) {
+ErrorInfo loadCellFromFile(Cell *cell, const char *file) {
     ErrorInfo err = {.error = false};
 
     FILE *source;
