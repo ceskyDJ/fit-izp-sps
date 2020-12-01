@@ -22,9 +22,13 @@
  */
 #define LAST_ITEM "LAST_ITEM"
 /**
- * Selection for the end of the collection (array)
+ * Start capacity (max number of cells) for the row
  */
-#define END_OF_COLLECTION -1
+#define ROW_START_CAPACITY 1
+/**
+ * Start capacity (max number of rows) for the table
+ */
+#define TABLE_START_CAPACITY 1
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -53,19 +57,23 @@ typedef struct cell {
  * Individual table row
  * @field cells Cells in the row
  * @field size Number of cells in the row
+ * @field capacity How many cells can be in the row
  */
 typedef struct row {
     Cell *cells;
     int size;
+    int capacity;
 } Row;
 /**
  * The whole table
  * @field rows Rows in the table
  * @field size Number of rows in the table
+ * @field capacity How many cells can be in the row
  */
 typedef struct table {
     Row *rows;
     int size;
+    int capacity;
 } Table;
 
 // Input/output functions
@@ -78,12 +86,17 @@ void writeErrorMessage(const char *message);
 ErrorInfo createTable(Table *table);
 ErrorInfo createRow(Row *row);
 ErrorInfo createCell(Cell *cell, const char *content);
+ErrorInfo copyCell(Cell *newCell, const Cell *sourceCell);
 ErrorInfo addRowToTable(Table *table, const Row *row, int position);
+ErrorInfo addColumnToTable(Table *table, const Cell *cell, int position);
 ErrorInfo addCellToRow(Row *row, const Cell *cell, int position);
-ErrorInfo deleteRowFromTable(Table *table, unsigned int position);
-ErrorInfo deleteColumnFromTable(Table *table, unsigned int columnNumber);
-ErrorInfo deleteCellFromTable(Table *table, unsigned int position);
+void deleteRowFromTable(Table *table, unsigned int position);
+void deleteColumnFromTable(Table *table, unsigned int columnNumber);
+void deleteCellFromTable(Table *table, unsigned int position);
 ErrorInfo alignRowSizes(Table *table);
+void destructTable(Table *table);
+void destructRow(Row *row);
+void destructCell(Cell *cell);
 ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, const char *newValue);
 char *getCellValue(Table *table, unsigned int row, unsigned int column);
 
@@ -210,7 +223,24 @@ void writeErrorMessage(const char *message) {
 ErrorInfo createTable(Table *table) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    if((table = malloc(sizeof(Table))) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro novou tabulku.";
+
+        return err;
+    }
+
+    if ((table->rows = malloc(TABLE_START_CAPACITY * sizeof(Row))) == NULL) {
+        free(table);
+
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro data tabulky.";
+
+        return err;
+    }
+
+    table->size = 0;
+    table->capacity = TABLE_START_CAPACITY;
 
     return err;
 }
@@ -223,7 +253,24 @@ ErrorInfo createTable(Table *table) {
 ErrorInfo createRow(Row *row) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    if ((row = malloc(sizeof(Row))) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro novy radek.";
+
+        return err;
+    }
+
+    if ((row->cells = malloc(ROW_START_CAPACITY * sizeof(Cell))) == NULL) {
+        free(row);
+
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro data radku.";
+
+        return err;
+    }
+
+    row->size = 0;
+    row->capacity = ROW_START_CAPACITY;
 
     return err;
 }
@@ -237,9 +284,34 @@ ErrorInfo createRow(Row *row) {
 ErrorInfo createCell(Cell *cell, const char *content) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    if ((cell = malloc(sizeof(Cell))) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro novou bunku.";
+
+        return err;
+    }
+
+    if ((cell->data = malloc(strlen(content))) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro data bunky.";
+
+        return err;
+    }
+
+    strcpy(cell->data, content);
+    cell->size = (int)strlen(cell->data);
 
     return err;
+}
+
+/**
+ * Makes a copy of the cell
+ * @param newCell Where to save the new cell
+ * @param sourceCell Source cell to copy
+ * @return Error information
+ */
+ErrorInfo copyCell(Cell *newCell, const Cell *sourceCell) {
+    return createCell(newCell, sourceCell->data);
 }
 
 /**
@@ -252,7 +324,47 @@ ErrorInfo createCell(Cell *cell, const char *content) {
 ErrorInfo addRowToTable(Table *table, const Row *row, int position) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    // Resizing table if needed
+    if (table->capacity < (table->size + 1)) {
+        if ((table->rows = realloc(table->rows, sizeof(Row) * table->capacity * 2)) == NULL) {
+            destructTable(table);
+
+            err.error = true;
+            err.message = "Nepodarilo se rozsirit pametovy prostor pro tabulku.";
+
+            return err;
+        }
+    }
+
+    // Free up space on specified position
+    for (int i = table->size; i >= position; i--) {
+        table->rows[i + 1] = table->rows[i];
+    }
+
+    // Insert the row to the specified position
+    table->rows[position] = *row;
+
+    return err;
+}
+
+/**
+ * Adds a column to the table (inserts cell with the same data to all of the rows)
+ * @param table Table to edit
+ * @param cell Cell to insert
+ * @param position Position in the table (0 = first)
+ * @return Error information
+ */
+ErrorInfo addColumnToTable(Table *table, const Cell *cell, int position) {
+    ErrorInfo err = {.error = false};
+
+    // Add cell to every row at specified position
+    for (int i = 0; i < table->size; i++) {
+        if ((err = addCellToRow(&table->rows[i], cell, position)).error) {
+            destructTable(table);
+
+            return err;
+        }
+    }
 
     return err;
 }
@@ -267,7 +379,25 @@ ErrorInfo addRowToTable(Table *table, const Row *row, int position) {
 ErrorInfo addCellToRow(Row *row, const Cell *cell, int position) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    // Resizing the row if needed
+    if (row->capacity < (row->size + 1)) {
+        if ((row->cells = realloc(row->cells, sizeof(Cell) * row->capacity * 2)) == NULL) {
+            destructRow(row);
+
+            err.error = true;
+            err.message = "Nepodarilo se rozsirit pametovy prostor pro radek.";
+
+            return err;
+        }
+    }
+
+    // Free up the space on specified position
+    for (int i = row->size; i > position; i--) {
+        row->cells[i + 1] = row->cells[i];
+    }
+
+    // Insert the cell to the specified position
+    row->cells[position] = *cell;
 
     return err;
 }
@@ -276,42 +406,33 @@ ErrorInfo addCellToRow(Row *row, const Cell *cell, int position) {
  * Deletes the row from the table
  * @param table Table to edit
  * @param position Position with the row to delete
- * @return Error information
  */
-ErrorInfo deleteRowFromTable(Table *table, unsigned int position) {
-    ErrorInfo err = {.error = false};
+void deleteRowFromTable(Table *table, unsigned int position) {
+    // Move rows to replace and fill the deleted position
+    for (int i = (int)position; i < table->size - 1; i++) {
+        table->rows[i] = table->rows[i + 1];
+    }
 
-    // TODO: implement the function...
-
-    return err;
+    // The size has been changed
+    table->size--;
 }
 
 /**
  * Deletes the column from the table
  * @param table Table to edit
  * @param columnNumber Number of column to delete
- * @return Error information
  */
-ErrorInfo deleteColumnFromTable(Table *table, unsigned int columnNumber) {
-    ErrorInfo err = {.error = false};
+void deleteColumnFromTable(Table *table, unsigned int columnNumber) {
+    // Delete the cell on position columnNumber from every row of the table
+    for (int i = 0; i < table->size; i++) {
+        // Move cells to replace and fill the deleted position
+        for (int j = (int)columnNumber; j < table->rows[i].size - 1; j++) {
+            table->rows[i].cells[j] = table->rows[i].cells[j + 1];
+        }
 
-    // TODO: implement the function...
-
-    return err;
-}
-
-/**
- * Deletes the cell from the table
- * @param table Table to edit
- * @param position Position of the cell to delete
- * @return Error information
- */
-ErrorInfo deleteCellFromTable(Table *table, unsigned int position) {
-    ErrorInfo err = {.error = false};
-
-    // TODO: implement the function...
-
-    return err;
+        // The size has been changed
+        table->rows[i].size--;
+    }
 }
 
 /**
@@ -322,7 +443,32 @@ ErrorInfo deleteCellFromTable(Table *table, unsigned int position) {
 ErrorInfo alignRowSizes(Table *table) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    // Find number of cells in the biggest row (row with the most cells)
+    int biggestRow = 0;
+    for (int i = biggestRow + 1; i < table->size; i++) {
+        if (table->rows[i].size > table->rows[biggestRow].size) {
+            biggestRow = i;
+        }
+    }
+
+    // Set number of cells in each row by the row with the most cells
+    for (int i = 0; i < table->size; i++) {
+        for (int j = table->rows[i].size; j < biggestRow; j++) {
+            // Prepare empty cell
+            Cell cell;
+            if ((err = createCell(&cell, "")).error) {
+                destructTable(table);
+
+                return err;
+            }
+
+            if ((err = addCellToRow(&table->rows[i], &cell, j)).error) {
+                destructTable(table);
+
+                return err;
+            }
+        }
+    }
 
     return err;
 }
@@ -338,9 +484,95 @@ ErrorInfo alignRowSizes(Table *table) {
 ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    // Add missing columns to the first row (it will be distributed automatically by calling alignRowSizes() function)
+    for (int i = table->rows[0].size; i < (int)columns; i++) {
+        // Prepare the new cell
+        Cell cell;
+        if ((err = createCell(&cell, "")).error) {
+            destructTable(table);
+
+            return err;
+        }
+
+        // Add the cell to the row
+        if ((err = addCellToRow(&table->rows[0], &cell, i)).error) {
+            destructTable(table);
+
+            return err;
+        }
+    }
+
+    // Add missing rows
+    for (int i = table->size; i < (int)rows; i++) {
+        // Prepare the new row
+        Row row;
+        if ((err = createRow(&row)).error) {
+            destructTable(table);
+
+            return err;
+        }
+
+        // Add the row into table
+        if ((err = addRowToTable(table, &row, i)).error) {
+            destructTable(table);
+
+            return err;
+        }
+    }
+
+    // Add missing empty cells
+    alignRowSizes(table);
 
     return err;
+}
+
+/**
+ * Destructs table (= deallocates all of its allocated memory)
+ * @param table Table to be destructed
+ */
+void destructTable(Table *table) {
+    // Content
+    for (int i = 0; i < table->size; i++) {
+        destructRow(&table->rows[i]);
+    }
+
+    free(table->rows);
+    table->capacity = 0;
+    table->size = 0;
+
+    // Table
+    free(table);
+}
+
+/**
+ * Destruct row (= deallocates all of its allocated memory)
+ * @param row Row to be destructed
+ */
+void destructRow(Row *row) {
+    // Content
+    for (int i = 0; i < row->size; i++) {
+        destructCell(&row->cells[i]);
+    }
+
+    free(row->cells);
+    row->capacity = 0;
+    row->size = 0;
+
+    // Row
+    free(row);
+}
+
+/**
+ * Destruct cell (= deallocates all of its allocated memory)
+ * @param cell Cell to be destructed
+ */
+void destructCell(Cell *cell) {
+    // Content
+    free(cell->data);
+    cell->size = 0;
+
+    // Cell
+    free(cell);
 }
 
 /**
@@ -354,7 +586,23 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
 ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, const char *newValue) {
     ErrorInfo err = {.error = false};
 
-    // TODO: implement the function...
+    // Get cell and new value's size for easier manipulation
+    Cell *cell = &table->rows[row].cells[column];
+    int newSize = (int)strlen(newValue);
+
+    // Resize for the new value
+    if ((realloc(cell->data, newSize)) == NULL) {
+        destructTable(table);
+
+        err.error = true;
+        err.message = "Nepodarilo se rozsirit pametovy prostor bunky.";
+
+        return err;
+    }
+
+    // Set the new value
+    memcpy(cell->data, newValue, newSize);
+    cell->size = newSize;
 
     return err;
 }
@@ -367,7 +615,5 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
  * @return Value of the cell
  */
 char *getCellValue(Table *table, unsigned int row, unsigned int column) {
-    // TODO: implement the function...
-
-    return "";
+    return table->rows[row].cells[column].data;
 }
