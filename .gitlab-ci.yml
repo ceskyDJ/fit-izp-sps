@@ -1,0 +1,37 @@
+image: registry.gitlab.com/kostirez1/izp-docker-tester:latest
+
+stages:
+  - build
+  - test
+  - codecheck
+
+build:
+  stage: build
+  script:
+    - gcc -std=c99 -Wall -Wextra -Werror sps.c -o sps
+  artifacts:
+    paths:
+      - sps
+
+unit:
+  stage: test
+  script:
+    - git clone https://github.com/Adrijaned/IZP2tester tests
+    - cp sps tests/
+    - cd tests
+    - python3 IZP2tester_zs2020.py -v sps
+
+cppcheck:
+  stage: codecheck
+  script:
+    - cppcheck --error-exitcode=1 --enable=all --language=c --suppress=missingIncludeSystem --verbose sps.c
+
+valgrind:
+  stage: codecheck
+  script:
+    - valgrind --leak-check=full ./sps
+
+infer:
+  stage: codecheck
+  script:
+    - infer run -- clang -c sps.c
