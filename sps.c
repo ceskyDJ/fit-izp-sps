@@ -721,6 +721,11 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
  * @param table Table to be destructed
  */
 void destructTable(Table *table) {
+    // In case the table has been already destructed
+    if (table == NULL) {
+        return;
+    }
+
     for (unsigned i = 0; i < table->size; i++) {
         destructRow(&(table->rows[i]));
     }
@@ -737,6 +742,11 @@ void destructTable(Table *table) {
  * @param row Row to be destructed
  */
 void destructRow(Row *row) {
+    // In case the row has been already destructed
+    if (row == NULL) {
+        return;
+    }
+
     for (unsigned i = 0; i < row->size; i++) {
         destructCell(&(row->cells[i]));
     }
@@ -751,6 +761,11 @@ void destructRow(Row *row) {
  * @param cell Cell to be destructed
  */
 void destructCell(Cell *cell) {
+    // In case the cell has been already destructed
+    if (cell == NULL) {
+        return;
+    }
+
     free(cell->data);
     cell->size = 0;
 }
