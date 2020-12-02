@@ -787,7 +787,7 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
 
     // Resize for the new value
     // The last '\0' --> + 1
-    if ((realloc(cell->data, (newSize + 1) * sizeof(char))) == NULL) {
+    if ((cell->data = realloc(cell->data, (newSize + 1) * sizeof(char))) == NULL) {
         err.error = true;
         err.message = "Nepodarilo se rozsirit pametovy prostor bunky.";
 
