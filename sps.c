@@ -93,6 +93,17 @@ typedef struct table {
     unsigned int size;
     unsigned int capacity;
 } Table;
+/**
+ * @typedef Command for data selection or manipulating with them
+ * @field name Command's name (selections have the same name "select")
+ * @field intParams Parameters of type integer
+ * @field strParams Parameters of type string
+ */
+typedef struct command {
+    char *name;
+    int intParams[4];
+    char *strParams[4];
+} Command;
 
 // Input/output functions
 Table *loadTableFromFile(FILE *file, char *delimiters);
