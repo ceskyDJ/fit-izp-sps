@@ -113,6 +113,8 @@ void deleteRowFromTable(Table *table, unsigned int position);
 void deleteColumnFromTable(Table *table, unsigned int columnNumber);
 void deleteCellFromTable(Table *table, unsigned int position);
 ErrorInfo alignRowSizes(Table *table);
+void trimRows(Table *table);
+ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns);
 void destructTable(Table *table);
 void destructRow(Row *row);
 void destructCell(Cell *cell);
@@ -317,6 +319,9 @@ Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag) {
  * @param delimiter Column delimiter
  */
 void saveTableToFile(Table *table, FILE *file, char *delimiters) {
+    // Trim rows of the table
+    trimRows(table);
+
     // Main delimiter
     char mainDelimiter = delimiters[0];
 
@@ -663,6 +668,32 @@ ErrorInfo alignRowSizes(Table *table) {
     }
 
     return err;
+}
+
+/**
+ * Trims rows of the table (removes empty column at the end of the table)
+ * @param table Table to edit
+ */
+void trimRows(Table *table) {
+    // Get the maximum number of columns in the row
+    unsigned mostColumns = 0;
+    for (unsigned i = 0; i < table->size; i++) {
+        unsigned validColumns = 0;
+        for (unsigned j = 0; j < table->rows[i].size; j++) {
+            if (table->rows[i].cells[j].size != 0) {
+                validColumns = j + 1;
+            }
+        }
+
+        if (validColumns > mostColumns) {
+            mostColumns = validColumns;
+        }
+    }
+
+    // Delete all unnecessary columns
+    for (unsigned j = table->rows[0].size; j > mostColumns; j--) {
+        deleteColumnFromTable(table, j);
+    }
 }
 
 /**
