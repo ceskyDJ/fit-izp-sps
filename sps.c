@@ -18,22 +18,38 @@
  */
 #define DEFAULT_DELIMITER " "
 /**
- * Flag for the last item
+ * @def LAST_CELL Flag for the last cell in the row
  */
-#define LAST_ITEM "LAST_ITEM"
+#define LAST_CELL 0
 /**
- * Start capacity (max number of cells) for the row
+ * @def LAST_ROW Flag for the last row in the file
+ */
+#define LAST_ROW 1
+/**
+ * @def CELL_START_CAPACITY Start capacity (number of chars) for the cell
+ */
+#define CELL_START_CAPACITY 1
+/**
+ * @def ROW_START_CAPACITY Start capacity (max number of cells) for the row
  */
 #define ROW_START_CAPACITY 1
 /**
- * Start capacity (max number of rows) for the table
+ * @def TABLE_START_CAPACITY Start capacity (max number of rows) for the table
  */
 #define TABLE_START_CAPACITY 1
+/**
+ * @def SPECIAL_CHARS List of special characters (they must be escaped)
+ */
+#define SPECIAL_CHARS "\"\\"
 
 /**
  * @def streq(first, second) Check if first equals second
  */
 #define streq(first, second) (strcmp(first, second) == 0)
+/**
+ * @def strc(str, c) Check if string (str) contains char (c)
+ */
+#define strc(str, c) (strchr(str, c) != NULL)
 
 /**
  * @typedef Error information tells how some action ended
@@ -45,51 +61,54 @@ typedef struct errorInfo {
     char *message;
 } ErrorInfo;
 /**
- * Individual table cell
+ * @typedef Individual table cell
  * @field data Cell's content
  * @field size Size of the cell's content
+ * @field capacity How many chars can be in the cell
  */
 typedef struct cell {
     char *data;
-    int size;
+    unsigned int size;
+    unsigned int capacity;
 } Cell;
 /**
- * Individual table row
+ * @typedef Individual table row
  * @field cells Cells in the row
  * @field size Number of cells in the row
  * @field capacity How many cells can be in the row
  */
 typedef struct row {
     Cell *cells;
-    int size;
-    int capacity;
+    unsigned int size;
+    unsigned int capacity;
 } Row;
 /**
- * The whole table
+ * @typedef The whole table
  * @field rows Rows in the table
  * @field size Number of rows in the table
  * @field capacity How many cells can be in the row
  */
 typedef struct table {
     Row *rows;
-    int size;
-    int capacity;
+    unsigned int size;
+    unsigned int capacity;
 } Table;
 
 // Input/output functions
-ErrorInfo loadTableFromFile(Table * table, const char *file);
-ErrorInfo loadRowFromFile(Row *row, const char *file);
-ErrorInfo loadCellFromFile(Cell *cell, const char *file);
-void saveTableToFile(Table *table, const char *file);
+Table *loadTableFromFile(FILE *file, char *delimiters);
+Row *loadRowFromFile(FILE *file, char *delimiters, char *flag);
+Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag);
+void saveTableToFile(Table *table, FILE *file, char *delimiters);
 void writeErrorMessage(const char *message);
 // Functions for working with table and its components
-ErrorInfo createTable(Table *table);
-ErrorInfo createRow(Row *row);
-ErrorInfo createCell(Cell *cell, const char *content);
-ErrorInfo copyCell(Cell *newCell, const Cell *sourceCell);
-ErrorInfo addRowToTable(Table *table, const Row *row, int position);
-ErrorInfo addColumnToTable(Table *table, const Cell *cell, int position);
-ErrorInfo addCellToRow(Row *row, const Cell *cell, int position);
+Table *createTable();
+Row *createRow();
+Cell *createCell();
+Cell *copyCell(const Cell *sourceCell);
+ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position);
+ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position);
+ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position);
+ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position);
 void deleteRowFromTable(Table *table, unsigned int position);
 void deleteColumnFromTable(Table *table, unsigned int columnNumber);
 void deleteCellFromTable(Table *table, unsigned int position);
@@ -107,8 +126,6 @@ char *getCellValue(Table *table, unsigned int row, unsigned int column);
  * @return Exit code
  */
 int main(int argc, char **argv) {
-    ErrorInfo err;
-
     /* ARGUMENTS PARSING */
     // Valid arguments: ./sps [-d DELIMITERS] <CMD_SEQUENCE> <FILE>
     // Check arguments count
@@ -141,70 +158,211 @@ int main(int argc, char **argv) {
     char *inputFile = argv[skippedArgs];
 
     /* DATA PARSING */
-    Table table;
-    if ((err = loadTableFromFile(&table, inputFile)).error) {
-        writeErrorMessage(err.message);
+    // Open the file for reading
+    FILE *fileRead;
+    if ((fileRead = fopen(inputFile, "r")) == NULL) {
+        writeErrorMessage("Zadany soubor se nepodarilo otevrit pro cteni.");
 
         return EXIT_FAILURE;
     }
+
+    // Load data from file
+    Table *table;
+    if ((table = loadTableFromFile(fileRead, *delimiters)) == NULL) {
+        writeErrorMessage("Nepodarilo se nacist tabulku z duvodu chyby pri alokaci pameti.");
+
+        destructTable(table);
+        fclose(fileRead);
+        return EXIT_FAILURE;
+    }
+
+    // Close the read file
+    fclose(fileRead);
+
+    /* OUTPUT SAVING */
+    // Open the file for writing
+    FILE *fileWrite;
+    if ((fileWrite = fopen(inputFile, "w")) == NULL) {
+        writeErrorMessage("Zadany soubor se nepodarilo otevrit pro zapis.");
+
+        return EXIT_FAILURE;
+    }
+
+    // Write output to the file
+    saveTableToFile(table, fileWrite, *delimiters);
+
+    // Deallocate table and close the write file
+    destructTable(table);
+    fclose(fileWrite);
 
     return EXIT_SUCCESS;
 }
 
 /**
  * Constructs table with data from a file
- * @param table Where to save the table
- * @param file The file with data for table
- * @return Error information
+ * @param fileName Name of the input file
+ * @param delimiters Column delimiters
+ * @return Loaded table
  */
-ErrorInfo loadTableFromFile(Table *table, const char *file) {
-    ErrorInfo err = {.error = false};
+Table *loadTableFromFile(FILE *file, char *delimiters) {
+    // Prepare new table
+    Table *table;
+    if ((table = createTable()) == NULL) {
+        return NULL;
+    }
 
-    // TODO: implement the function...
+    // Load table data
+    char flag = -1;
+    while (flag != LAST_ROW) {
+        // Get the row data
+        Row *row;
+        if ((row = loadRowFromFile(file, delimiters, &flag)) == NULL) {
+            return NULL;
+        }
 
-    return err;
+        // Add the row at the end of the table (table->size == last index + 1)
+        if ((addRowToTable(table, row, table->size)).error) {
+            return NULL;
+        }
+    }
+
+    // Align rows to the same number of columns
+    if (alignRowSizes(table).error) {
+        return NULL;
+    }
+
+    return table;
 }
 
 /**
  * Constructs row with data from a file
- * @param row Where to save the row
  * @param file The file with data for the row
- * @return Error information or special state for the last row in the table
+ * @param delimiters Column delimiters
+ * @param flag Flag for returning special states
+ * @return Loaded row
  */
-ErrorInfo loadRowFromFile(Row *row, const char *file) {
-    ErrorInfo err = {.error = false};
+Row *loadRowFromFile(FILE *file, char *delimiters, char *flag) {
+    // Prepare new row
+    Row *row;
+    if ((row = createRow()) == NULL) {
+        return NULL;
+    }
 
-    // TODO: implement the function...
+    // Load row data
+    while (*flag != LAST_ROW && *flag != LAST_CELL) {
+        // Get the cell data
+        Cell *cell;
+        if ((cell = loadCellFromFile(file, delimiters, flag)) == NULL) {
+            return NULL;
+        }
 
-    return err;
+        // Add the cell to the end of the row (row->size == last index + 1)
+        if ((addCellToRow(row, cell, row->size)).error) {
+            return NULL;
+        }
+    }
+
+    if (*flag == LAST_CELL) {
+        *flag = -1;
+    }
+
+    return row;
 }
 
 /**
  * Constructs cell with data from a file
- * @param cell Where to save the cell
  * @param file The file with data for the row
- * @return Error information or special state for the last cell in the row
+ * @param delimiters Column delimiters
+ * @param flag Flag for returning special states
+ * @return Loaded cell
  */
-ErrorInfo loadCellFromFile(Cell *cell, const char *file) {
-    ErrorInfo err = {.error = false};
-
-    FILE *source;
-    if ((source = fopen(file, "r")) == NULL) {
-        writeErrorMessage("Soubor predany ve vstupnich argumentech se nepodarilo otevrit.");
-
-        // TODO: implement the function...
+Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag) {
+    // Prepare the cell
+    Cell *cell;
+    if ((cell = createCell()) == NULL) {
+        return NULL;
     }
 
-    return err;
+    // Load data from file
+    int prevC = '\0'; // Previous loaded char
+    int c; // Loaded char
+    bool ignoreDelimiters = false;
+    while ((c = getc(file)) != EOF && c != '\n' && (!strc(delimiters, c) || ignoreDelimiters)) {
+        if (c == '"' && prevC != '\\') {
+            ignoreDelimiters = !ignoreDelimiters;
+        } else if (!strc(SPECIAL_CHARS, c) || prevC == '\\'){
+            addCharToCell(cell, (char)c, cell->size);
+        }
+
+        prevC = c;
+    }
+
+    // Detect the last row and the last cell (by cause of the while end)
+    if (c == '\n') {
+        *flag = LAST_CELL;
+    }
+
+    if ((c = getc(file)) == EOF) {
+        *flag = LAST_ROW;
+    }
+    ungetc(c, file); // Put the char back to the file
+
+    return cell;
 }
 
 /**
  * Saves table data to the file
  * @param table Table to save
  * @param file The file to save the table into
+ * @param delimiter Column delimiter
  */
-void saveTableToFile(Table *table, const char *file) {
-    // TODO: implement the function...
+void saveTableToFile(Table *table, FILE *file, char *delimiters) {
+    // Main delimiter
+    char mainDelimiter = delimiters[0];
+
+    for (unsigned i = 0; i < table->size; i++) {
+        for (unsigned j = 0; j < table->rows[i].size; j++) {
+            Cell *cell = &(table->rows[i].cells[j]);
+
+            // Check if borders for cell contains delimiter are required
+            bool borders = false;
+            for (unsigned k = 0; k < strlen(delimiters); k++) {
+                if (strc(cell->data, delimiters[k])) {
+                    borders = true;
+
+                    break;
+                }
+            }
+
+            // Print left border
+            if (borders) {
+                fputc('"', file);
+            }
+
+            for (unsigned k = 0; k < cell->size; k++) {
+                // Add backslash before escaped characters
+                if (strc(SPECIAL_CHARS, cell->data[k])) {
+                    fputc('\\', file);
+                }
+
+                // Print char from cell data
+                fputc(cell->data[k], file);
+            }
+
+            // Print right border
+            if (borders) {
+                fputc('"', file);
+            }
+
+            // Add delimiter if not last
+            if (j + 1 < table->rows[i].size) {
+                fputc(mainDelimiter, file);
+            }
+        }
+
+        // Add line break
+        fputc('\n', file);
+    }
 }
 
 /**
@@ -217,101 +375,91 @@ void writeErrorMessage(const char *message) {
 
 /**
  * Creates a new table
- * @param table Where to save the table
- * @return Error information
+ * @return Pointer to the new table or NULL if error occurred
  */
-ErrorInfo createTable(Table *table) {
-    ErrorInfo err = {.error = false};
-
-    if((table = malloc(sizeof(Table))) == NULL) {
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro novou tabulku.";
-
-        return err;
-    }
-
-    if ((table->rows = malloc(TABLE_START_CAPACITY * sizeof(Row))) == NULL) {
-        free(table);
-
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro data tabulky.";
-
-        return err;
+Table *createTable() {
+    Table *table;
+    if ((table = malloc(sizeof(Table))) == NULL) {
+        return NULL;
     }
 
     table->size = 0;
     table->capacity = TABLE_START_CAPACITY;
 
-    return err;
+    if ((table->rows = malloc(TABLE_START_CAPACITY * sizeof(Row))) == NULL) {
+        free(table);
+        return NULL;
+    }
+
+    return table;
 }
 
 /**
  * Creates a new row
- * @param row Where to save the row
- * @return Error information
+ * @return Pointer to the new row or NULL if error occurred
  */
-ErrorInfo createRow(Row *row) {
-    ErrorInfo err = {.error = false};
-
+Row *createRow() {
+    Row *row;
     if ((row = malloc(sizeof(Row))) == NULL) {
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro novy radek.";
-
-        return err;
-    }
-
-    if ((row->cells = malloc(ROW_START_CAPACITY * sizeof(Cell))) == NULL) {
-        free(row);
-
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro data radku.";
-
-        return err;
+        return NULL;
     }
 
     row->size = 0;
     row->capacity = ROW_START_CAPACITY;
 
-    return err;
+    if ((row->cells = malloc(ROW_START_CAPACITY * sizeof(Cell))) == NULL) {
+        free(row);
+        return NULL;
+    }
+
+    return row;
 }
 
 /**
  * Creates a new cell
- * @param cell Where to save the cell
- * @param content Cells' content
- * @return Error information
+ * @return Pointer to the new cell or NULL if error occurred
  */
-ErrorInfo createCell(Cell *cell, const char *content) {
-    ErrorInfo err = {.error = false};
-
+Cell *createCell() {
+    Cell *cell;
     if ((cell = malloc(sizeof(Cell))) == NULL) {
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro novou bunku.";
-
-        return err;
+        return NULL;
     }
 
-    if ((cell->data = malloc(strlen(content))) == NULL) {
-        err.error = true;
-        err.message = "Nepodarilo se alokovat pamet pro data bunky.";
+    cell->size = 0;
+    cell->capacity = CELL_START_CAPACITY;
 
-        return err;
+    // The last '\0' --> + 1
+    if ((cell->data = malloc((CELL_START_CAPACITY + 1) * sizeof(char))) == NULL) {
+        free(cell);
+        return NULL;
     }
+    memset(cell->data, '\0', cell->capacity + 1);
 
-    strcpy(cell->data, content);
-    cell->size = (int)strlen(cell->data);
-
-    return err;
+    return cell;
 }
 
 /**
  * Makes a copy of the cell
- * @param newCell Where to save the new cell
  * @param sourceCell Source cell to copy
- * @return Error information
+ * @return Deep copy of the provided cell or NULL if error occurred
  */
-ErrorInfo copyCell(Cell *newCell, const Cell *sourceCell) {
-    return createCell(newCell, sourceCell->data);
+Cell *copyCell(const Cell *sourceCell) {
+    Cell *cell;
+    if ((cell = createCell()) == NULL) {
+        return NULL;
+    }
+
+    cell->capacity = sourceCell->capacity;
+    cell->size = sourceCell->size;
+
+    // The last '\0' --> + 1
+    if ((cell->data = malloc((cell->capacity + 1) * sizeof(char))) == NULL) {
+        free(cell);
+        return NULL;
+    }
+    memcpy(cell->data, sourceCell->data, cell->capacity + 1);
+
+    return cell;
 }
 
 /**
@@ -321,29 +469,32 @@ ErrorInfo copyCell(Cell *newCell, const Cell *sourceCell) {
  * @param position Position in the table (0 = first)
  * @return Error information
  */
-ErrorInfo addRowToTable(Table *table, const Row *row, int position) {
+ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
     ErrorInfo err = {.error = false};
 
     // Resizing table if needed
     if (table->capacity < (table->size + 1)) {
-        if ((table->rows = realloc(table->rows, sizeof(Row) * table->capacity * 2)) == NULL) {
-            destructTable(table);
-
+        if ((table->rows = realloc(table->rows, table->capacity * 2 * sizeof(Row))) == NULL) {
             err.error = true;
             err.message = "Nepodarilo se rozsirit pametovy prostor pro tabulku.";
 
             return err;
         }
+
+        table->capacity *= 2;
     }
 
     // Free up space on specified position
-    for (int i = table->size; i >= position; i--) {
+    for (unsigned i = table->size; i > position; i--) {
         table->rows[i + 1] = table->rows[i];
     }
 
     // Insert the row to the specified position
     table->rows[position] = *row;
+    table->size++;
 
+    // Row has been inserted into table, the pointer won't be needed
+    free(row);
     return err;
 }
 
@@ -354,18 +505,19 @@ ErrorInfo addRowToTable(Table *table, const Row *row, int position) {
  * @param position Position in the table (0 = first)
  * @return Error information
  */
-ErrorInfo addColumnToTable(Table *table, const Cell *cell, int position) {
+ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
     ErrorInfo err = {.error = false};
 
     // Add cell to every row at specified position
-    for (int i = 0; i < table->size; i++) {
-        if ((err = addCellToRow(&table->rows[i], cell, position)).error) {
-            destructTable(table);
-
+    for (unsigned i = 0; i < table->size; i++) {
+        Cell *cellCopy = copyCell(cell);
+        if ((err = addCellToRow(&(table->rows[i]), cellCopy, position)).error) {
             return err;
         }
     }
 
+    // Cell has been inserted into table, the pointer won't be needed
+    free(cell);
     return err;
 }
 
@@ -376,28 +528,69 @@ ErrorInfo addColumnToTable(Table *table, const Cell *cell, int position) {
  * @param position Position in the row (0 = first)
  * @return Error information
  */
-ErrorInfo addCellToRow(Row *row, const Cell *cell, int position) {
+ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
     ErrorInfo err = {.error = false};
 
     // Resizing the row if needed
     if (row->capacity < (row->size + 1)) {
-        if ((row->cells = realloc(row->cells, sizeof(Cell) * row->capacity * 2)) == NULL) {
-            destructRow(row);
-
+        if ((row->cells = realloc(row->cells, row->capacity * 2 * sizeof(Cell))) == NULL) {
             err.error = true;
             err.message = "Nepodarilo se rozsirit pametovy prostor pro radek.";
 
             return err;
         }
+
+        row->capacity *= 2;
     }
 
     // Free up the space on specified position
-    for (int i = row->size; i > position; i--) {
+    for (unsigned i = row->size; i > position; i--) {
         row->cells[i + 1] = row->cells[i];
     }
 
     // Insert the cell to the specified position
     row->cells[position] = *cell;
+    row->size++;
+
+    // Cell has been inserted into row, the pointer won't be needed
+    free(cell);
+    return err;
+}
+
+/**
+ * Adds a char to the cell
+ * @param cell Cell to edit
+ * @param c Char to insert
+ * @param position Position in the cell (0 = first)
+ * @return Error information
+ */
+ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position) {
+    ErrorInfo err = {.error = false};
+
+    // Resize data for the cell if needed
+    if (cell->capacity < (cell->size + 1)) {
+        // The last '\0' --> + 1
+        if ((cell->data = realloc(cell->data, (2 * cell->capacity + 1) * sizeof(char))) == NULL) {
+            err.error = true;
+            err.message = "Nepodarilo se rozsirit pametovy prostor pro bunku.";
+
+            return err;
+        }
+
+        cell->capacity *= 2;
+    }
+
+    // Fill newly allocated space with zero bytes
+    memset(&(cell->data[cell->size]), '\0', cell->capacity - cell->size + 1);
+
+    // Free up the space on specified position
+    for (unsigned i = cell->size; i > position; i--) {
+        cell->data[i + 1] = cell->data[i];
+    }
+
+    // Append char to the cell data (cell.size == last index + 1)
+    cell->data[position] = c;
+    cell->size++;
 
     return err;
 }
@@ -409,7 +602,7 @@ ErrorInfo addCellToRow(Row *row, const Cell *cell, int position) {
  */
 void deleteRowFromTable(Table *table, unsigned int position) {
     // Move rows to replace and fill the deleted position
-    for (int i = (int)position; i < table->size - 1; i++) {
+    for (unsigned i = (int)position; i < table->size - 1; i++) {
         table->rows[i] = table->rows[i + 1];
     }
 
@@ -424,9 +617,9 @@ void deleteRowFromTable(Table *table, unsigned int position) {
  */
 void deleteColumnFromTable(Table *table, unsigned int columnNumber) {
     // Delete the cell on position columnNumber from every row of the table
-    for (int i = 0; i < table->size; i++) {
+    for (unsigned i = 0; i < table->size; i++) {
         // Move cells to replace and fill the deleted position
-        for (int j = (int)columnNumber; j < table->rows[i].size - 1; j++) {
+        for (unsigned j = (int)columnNumber; j < table->rows[i].size - 1; j++) {
             table->rows[i].cells[j] = table->rows[i].cells[j + 1];
         }
 
@@ -444,27 +637,26 @@ ErrorInfo alignRowSizes(Table *table) {
     ErrorInfo err = {.error = false};
 
     // Find number of cells in the biggest row (row with the most cells)
-    int biggestRow = 0;
-    for (int i = biggestRow + 1; i < table->size; i++) {
+    unsigned biggestRow = 0;
+    for (unsigned i = biggestRow + 1; i < table->size; i++) {
         if (table->rows[i].size > table->rows[biggestRow].size) {
             biggestRow = i;
         }
     }
 
     // Set number of cells in each row by the row with the most cells
-    for (int i = 0; i < table->size; i++) {
-        for (int j = table->rows[i].size; j < biggestRow; j++) {
+    for (unsigned i = 0; i < table->size; i++) {
+        for (unsigned j = table->rows[i].size; j < table->rows[biggestRow].size; j++) {
             // Prepare empty cell
-            Cell cell;
-            if ((err = createCell(&cell, "")).error) {
-                destructTable(table);
+            Cell *cell;
+            if ((cell = createCell()) == NULL) {
+                err.error = true;
+                err.message = "Nepodarilo se alokovat pamet pro novou bunku.";
 
                 return err;
             }
 
-            if ((err = addCellToRow(&table->rows[i], &cell, j)).error) {
-                destructTable(table);
-
+            if ((err = addCellToRow(&(table->rows[i]), cell, j)).error) {
                 return err;
             }
         }
@@ -485,37 +677,35 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
     ErrorInfo err = {.error = false};
 
     // Add missing columns to the first row (it will be distributed automatically by calling alignRowSizes() function)
-    for (int i = table->rows[0].size; i < (int)columns; i++) {
+    for (unsigned i = table->rows[0].size; i < columns; i++) {
         // Prepare the new cell
-        Cell cell;
-        if ((err = createCell(&cell, "")).error) {
-            destructTable(table);
+        Cell *cell;
+        if ((cell = createCell()) == NULL) {
+            err.error = true;
+            err.message = "Nepodarilo se alokovat pamet pro novou bunku.";
 
             return err;
         }
 
         // Add the cell to the row
-        if ((err = addCellToRow(&table->rows[0], &cell, i)).error) {
-            destructTable(table);
-
+        if ((err = addCellToRow(&(table->rows[0]), cell, i)).error) {
             return err;
         }
     }
 
     // Add missing rows
-    for (int i = table->size; i < (int)rows; i++) {
+    for (unsigned i = table->size; i < rows; i++) {
         // Prepare the new row
-        Row row;
-        if ((err = createRow(&row)).error) {
-            destructTable(table);
+        Row *row;
+        if ((row = createRow()) == NULL) {
+            err.error = true;
+            err.message = "Nepodarilo se alokovat pamet pro novy radek.";
 
             return err;
         }
 
         // Add the row into table
-        if ((err = addRowToTable(table, &row, i)).error) {
-            destructTable(table);
-
+        if ((err = addRowToTable(table, row, i)).error) {
             return err;
         }
     }
@@ -531,16 +721,14 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
  * @param table Table to be destructed
  */
 void destructTable(Table *table) {
-    // Content
-    for (int i = 0; i < table->size; i++) {
-        destructRow(&table->rows[i]);
+    for (unsigned i = 0; i < table->size; i++) {
+        destructRow(&(table->rows[i]));
     }
 
     free(table->rows);
     table->capacity = 0;
     table->size = 0;
 
-    // Table
     free(table);
 }
 
@@ -549,17 +737,13 @@ void destructTable(Table *table) {
  * @param row Row to be destructed
  */
 void destructRow(Row *row) {
-    // Content
-    for (int i = 0; i < row->size; i++) {
-        destructCell(&row->cells[i]);
+    for (unsigned i = 0; i < row->size; i++) {
+        destructCell(&(row->cells[i]));
     }
 
     free(row->cells);
     row->capacity = 0;
     row->size = 0;
-
-    // Row
-    free(row);
 }
 
 /**
@@ -567,12 +751,8 @@ void destructRow(Row *row) {
  * @param cell Cell to be destructed
  */
 void destructCell(Cell *cell) {
-    // Content
     free(cell->data);
     cell->size = 0;
-
-    // Cell
-    free(cell);
 }
 
 /**
@@ -587,21 +767,21 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
     ErrorInfo err = {.error = false};
 
     // Get cell and new value's size for easier manipulation
-    Cell *cell = &table->rows[row].cells[column];
+    Cell *cell = &(table->rows[row].cells[column]);
     int newSize = (int)strlen(newValue);
 
     // Resize for the new value
-    if ((realloc(cell->data, newSize)) == NULL) {
-        destructTable(table);
-
+    // The last '\0' --> + 1
+    if ((realloc(cell->data, (newSize + 1) * sizeof(char))) == NULL) {
         err.error = true;
         err.message = "Nepodarilo se rozsirit pametovy prostor bunky.";
 
         return err;
     }
+    cell->capacity = newSize + 1;
 
     // Set the new value
-    memcpy(cell->data, newValue, newSize);
+    memcpy(cell->data, newValue, newSize + 1);
     cell->size = newSize;
 
     return err;
