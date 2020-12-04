@@ -12,11 +12,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 /**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER " "
+/**
+ * @def EMPTY_FLAG Flag with no information
+ */
+#define EMPTY_FLAG -1
 /**
  * @def LAST_CELL Flag for the last cell in the row
  */
@@ -53,6 +58,10 @@
  * @def COMMAND_PARAMS_SIZE Size of array with command parameters (maximum number of parameters, resp.)
  */
 #define COMMAND_PARAMS_SIZE 4
+/**
+ * @def LAST_ROW_COL_NUMBER Number represents the last row or column in selection
+ */
+#define LAST_ROW_COL_NUMBER -1
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -132,6 +141,7 @@ typedef struct commandSequence {
 Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag);
 Row *loadRowFromFile(FILE *file, char *delimiters, signed char *flag);
 Cell *loadCellFromFile(FILE *file, char *delimiters, signed char *flag);
+CommandSequence *loadCommandsFromString(const char *string, signed char *flag);
 void saveTableToFile(Table *table, FILE *file, char *delimiters);
 void writeErrorMessage(const char *message);
 // Functions for working with table and its components
@@ -166,6 +176,9 @@ void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
  * @return Exit code
  */
 int main(int argc, char **argv) {
+    // Flag for passing additional information from some functions
+    signed char flag;
+
     /* ARGUMENTS PARSING */
     // Valid arguments: ./sps [-d DELIMITERS] <CMD_SEQUENCE> <FILE>
     // Check arguments count
@@ -191,7 +204,17 @@ int main(int argc, char **argv) {
     }
 
     // Get commands from arguments
-    // TODO: Implement this...
+    CommandSequence *cmdSeq;
+    flag = EMPTY_FLAG;
+    if ((cmdSeq = loadCommandsFromString(argv[skippedArgs], &flag)) == NULL) {
+        if (flag != INVALID_INPUT_FORMAT) {
+            writeErrorMessage("Nepodarilo se nacist prikazy z duvodu chyby pri alokaci pameti.");
+        } else {
+            writeErrorMessage("Format prikazu ve vstupnim argumentu je chybny.");
+        }
+
+        return EXIT_FAILURE;
+    }
     skippedArgs += 1;
 
     // Get file from arguments
@@ -208,7 +231,7 @@ int main(int argc, char **argv) {
 
     // Load data from file
     Table *table;
-    signed char flag = -1;
+    flag = EMPTY_FLAG;
     if ((table = loadTableFromFile(fileRead, *delimiters, &flag)) == NULL) {
         if (flag == INVALID_INPUT_FORMAT) {
             writeErrorMessage("Vstupni soubor obsahuje bunku v chybnem formatu.");
@@ -374,6 +397,113 @@ Cell *loadCellFromFile(FILE *file, char *delimiters, signed char *flag) {
     ungetc(c, file); // Put the char back to the scope
 
     return cell;
+}
+
+/**
+ * Loads commands from string into command sequence
+ * @param string String with commands
+ * @param flag Flag for returning additional information
+ * @return Command sequence with loaded commands
+ */
+CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
+    CommandSequence *cmdSeq;
+    if ((cmdSeq = createCmdSeq()) == NULL) {
+        return NULL;
+    }
+
+    // Prepare first command
+    Command *cmd;
+    if ((cmd = createCmd()) == NULL) {
+        return NULL;
+    }
+
+    // Parse string to commands
+    unsigned i, cmdI, paramI;
+    for (i = cmdI = paramI = 0; i < strlen(string); i++) {
+        if (string[i] == ';') {
+            // Close the command
+            addNewCmdToSeq(cmdSeq, cmd);
+
+            // Prepare the next command
+            cmdI = 0;
+            paramI = 0;
+            if ((cmd = createCmd()) == NULL) {
+                return NULL;
+            }
+        } else if(string[i] == ' ') {
+            // Move to the next parameter
+            paramI++;
+            // Reset parameter string iteration var
+            cmdI = 0;
+        } else {
+            // Selection commands
+            if (cmdI == 0 && string[i] == '[') {
+                // Skip the '[' char
+                i++;
+
+                // Classic selection
+                if (isdigit(string[i]) || string[i] == '_') {
+                    // Set a name (this type of commands doesn't have a name in input string)
+                    memcpy(cmd->name, "select", 7);
+                    paramI = 1;
+                }
+
+                // Load parameters
+                while (string[i] != ']' && string[i] != ';') {
+                    if (string[i] == ',') {
+                        // Move to the next parameter
+                        paramI++;
+                        // Reset parameter string iteration var
+                        cmdI = 0;
+                    } else {
+                        // Resize string parameters by 1 for the saving of the next char
+                        // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
+                        char **param = &(cmd->strParams[paramI - 1]);
+                        if ((*param = realloc(*param, strlen(*param) + 1)) == NULL) {
+                            return NULL;
+                        }
+
+                        // Save the char
+                        (*param)[cmdI] = string[i];
+                    }
+
+                    i++;
+                }
+
+                if (string[i] == ';') {
+                    *flag = INVALID_INPUT_FORMAT;
+
+                    return NULL;
+                }
+
+                continue;
+            }
+
+            // Data processing commands
+            // Loading command name
+            if (paramI == 0) {
+                cmd->name[cmdI] = string[i];
+            } else {
+                // Resize string parameters by 1 for the saving of the next char
+                // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
+                char **param = &(cmd->strParams[paramI - 1]);
+                if ((*param = realloc(*param, strlen(*param) + 1)) == NULL) {
+                    return NULL;
+                }
+
+                // Save the char
+                (*param)[cmdI] = string[i];
+            }
+
+            // Increment command name/parameter string iteration var
+            cmdI++;
+        }
+    }
+
+    // Close the last command
+    addNewCmdToSeq(cmdSeq, cmd);
+
+    return cmdSeq;
 }
 
 /**
@@ -938,6 +1068,12 @@ Command *createCmd() {
     memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
     cmd->next = NULL;
 
+    for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
+        if ((cmd->strParams[i] = malloc(sizeof(char))) == NULL) {
+            return NULL;
+        }
+    }
+
     return cmd;
 }
 
@@ -950,6 +1086,7 @@ void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd) {
     // Behaviour is different for the first command
     if (cmdSeq->firstCmd == NULL) {
         cmdSeq->firstCmd = cmd;
+        cmdSeq->lastCmd = cmd;
 
         return;
     }
