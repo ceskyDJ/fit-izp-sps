@@ -62,6 +62,10 @@
  * @def LAST_ROW_COL_NUMBER Number represents the last row or column in selection
  */
 #define LAST_ROW_COL_NUMBER -1
+/**
+ * @def BAD_ROW_COL_NUMBER Number represents bad number of row or column provided in input
+ */
+#define BAD_ROW_COL_NUMBER 0
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -168,6 +172,7 @@ char *getCellValue(Table *table, unsigned int row, unsigned int column);
 CommandSequence *createCmdSeq();
 Command *createCmd();
 void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
+void convertTypesInCommandParams(CommandSequence *cmdSeq);
 
 /**
  * The main function
@@ -502,6 +507,9 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
 
     // Close the last command
     addNewCmdToSeq(cmdSeq, cmd);
+
+    // Convert string to int types of parameters
+    convertTypesInCommandParams(cmdSeq);
 
     return cmdSeq;
 }
@@ -1065,7 +1073,7 @@ Command *createCmd() {
     }
 
     memset(cmd->name, '\0', COMMAND_NAME_SIZE + 1);
-    memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
+    memset(cmd->intParams, BAD_ROW_COL_NUMBER, sizeof(int) * COMMAND_PARAMS_SIZE);
     cmd->next = NULL;
 
     for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
@@ -1097,4 +1105,25 @@ void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd) {
 
     // Set the new command as the last of the sequence
     cmdSeq->lastCmd = cmd;
+}
+
+/**
+ * Converts types of commands' parameters (from string to int, if possible)
+ * @param cmdSeq Command sequence with commands to edit
+ */
+void convertTypesInCommandParams(CommandSequence *cmdSeq) {
+    Command *cmd = cmdSeq->firstCmd;
+    while (cmd != NULL) {
+        for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
+            int value;
+            if (streq(cmd->strParams[i], "_")) {
+                cmd->intParams[i] = LAST_ROW_COL_NUMBER;
+            } else if ((value = (int)strtol(cmd->strParams[i], NULL, 10)) != 0) {
+                cmd->intParams[i] = value;
+            }
+        }
+
+        // Move to the next command
+        cmd = cmd->next;
+    }
 }
