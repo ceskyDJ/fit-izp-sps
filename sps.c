@@ -26,6 +26,10 @@
  */
 #define LAST_ROW 1
 /**
+ * @def INVALID_INPUT_FORMAT Flag for the input with invalid format (for ex. '"' at forbidden place)
+ */
+#define INVALID_INPUT_FORMAT 2
+/**
  * @def CELL_START_CAPACITY Start capacity (number of chars) for the cell
  */
 #define CELL_START_CAPACITY 1
@@ -95,9 +99,9 @@ typedef struct table {
 } Table;
 
 // Input/output functions
-Table *loadTableFromFile(FILE *file, char *delimiters);
-Row *loadRowFromFile(FILE *file, char *delimiters, char *flag);
-Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag);
+Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag);
+Row *loadRowFromFile(FILE *file, char *delimiters, signed char *flag);
+Cell *loadCellFromFile(FILE *file, char *delimiters, signed char *flag);
 void saveTableToFile(Table *table, FILE *file, char *delimiters);
 void writeErrorMessage(const char *message);
 // Functions for working with table and its components
@@ -170,8 +174,13 @@ int main(int argc, char **argv) {
 
     // Load data from file
     Table *table;
-    if ((table = loadTableFromFile(fileRead, *delimiters)) == NULL) {
-        writeErrorMessage("Nepodarilo se nacist tabulku z duvodu chyby pri alokaci pameti.");
+    signed char flag = -1;
+    if ((table = loadTableFromFile(fileRead, *delimiters, &flag)) == NULL) {
+        if (flag == INVALID_INPUT_FORMAT) {
+            writeErrorMessage("Vstupni soubor obsahuje bunku v chybnem formatu.");
+        } else {
+            writeErrorMessage("Nepodarilo se nacist tabulku z duvodu chyby pri alokaci pameti.");
+        }
 
         destructTable(table);
         fclose(fileRead);
@@ -206,7 +215,7 @@ int main(int argc, char **argv) {
  * @param delimiters Column delimiters
  * @return Loaded table
  */
-Table *loadTableFromFile(FILE *file, char *delimiters) {
+Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag) {
     // Prepare new table
     Table *table;
     if ((table = createTable()) == NULL) {
@@ -214,11 +223,10 @@ Table *loadTableFromFile(FILE *file, char *delimiters) {
     }
 
     // Load table data
-    char flag = -1;
-    while (flag != LAST_ROW) {
+    while (*flag != LAST_ROW) {
         // Get the row data
         Row *row;
-        if ((row = loadRowFromFile(file, delimiters, &flag)) == NULL) {
+        if ((row = loadRowFromFile(file, delimiters, flag)) == NULL) {
             return NULL;
         }
 
@@ -243,7 +251,7 @@ Table *loadTableFromFile(FILE *file, char *delimiters) {
  * @param flag Flag for returning special states
  * @return Loaded row
  */
-Row *loadRowFromFile(FILE *file, char *delimiters, char *flag) {
+Row *loadRowFromFile(FILE *file, char *delimiters, signed char *flag) {
     // Prepare new row
     Row *row;
     if ((row = createRow()) == NULL) {
@@ -278,7 +286,7 @@ Row *loadRowFromFile(FILE *file, char *delimiters, char *flag) {
  * @param flag Flag for returning special states
  * @return Loaded cell
  */
-Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag) {
+Cell *loadCellFromFile(FILE *file, char *delimiters, signed char *flag) {
     // Prepare the cell
     Cell *cell;
     if ((cell = createCell()) == NULL) {
@@ -291,12 +299,34 @@ Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag) {
     bool ignoreDelimiters = false;
     while ((c = getc(file)) != EOF && c != '\n' && (!strc(delimiters, c) || ignoreDelimiters)) {
         if (c == '"' && prevC != '\\') {
-            ignoreDelimiters = !ignoreDelimiters;
+            // Border char at the start of the cell
+            if (prevC == '\0') {
+                ignoreDelimiters = true;
+            } else {
+                // At the first position has been border char and it's the last char of the cell
+                int nextC;
+                if (((nextC = getc(file)) == '\n' || strc(delimiters, nextC)) && ignoreDelimiters) {
+                    // Next delimiter will end the cell
+                    ignoreDelimiters = false;
+                } else {
+                    *flag = INVALID_INPUT_FORMAT;
+
+                    return NULL;
+                }
+                ungetc(nextC, file); // Put the char back to the scope
+            }
         } else if (!strc(SPECIAL_CHARS, c) || prevC == '\\'){
             addCharToCell(cell, (char)c, cell->size);
         }
 
         prevC = c;
+    }
+
+    // The cell doesn't have end border char
+    if (ignoreDelimiters) {
+        *flag = INVALID_INPUT_FORMAT;
+
+        return NULL;
     }
 
     // Detect the last row and the last cell (by cause of the while end)
@@ -307,7 +337,7 @@ Cell *loadCellFromFile(FILE *file, char *delimiters, char *flag) {
     if ((c = getc(file)) == EOF) {
         *flag = LAST_ROW;
     }
-    ungetc(c, file); // Put the char back to the file
+    ungetc(c, file); // Put the char back to the scope
 
     return cell;
 }
