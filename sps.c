@@ -175,6 +175,8 @@ void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
 void convertTypesInCommandParams(CommandSequence *cmdSeq);
 void destructCommandSequence(CommandSequence *cmdSeq);
 void destructCommand(Command *cmd);
+// Data processing functions
+ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table);
 
 /**
  * The main function
@@ -183,6 +185,8 @@ void destructCommand(Command *cmd);
  * @return Exit code
  */
 int main(int argc, char **argv) {
+    // Data structure for passing error information from functions
+    ErrorInfo err;
     // Flag for passing additional information from some functions
     signed char flag;
 
@@ -228,7 +232,7 @@ int main(int argc, char **argv) {
     // Get file from arguments
     char *inputFile = argv[skippedArgs];
 
-    /* DATA PARSING */
+    /* DATA LOADING */
     // Open the file for reading
     FILE *fileRead;
     if ((fileRead = fopen(inputFile, "r")) == NULL) {
@@ -254,6 +258,13 @@ int main(int argc, char **argv) {
 
     // Close the read file
     fclose(fileRead);
+
+    /* DATA PARSING */
+    if ((err = processCommands(cmdSeq, table)).error) {
+        writeErrorMessage(err.message);
+
+        return EXIT_FAILURE;
+    }
 
     /* HELP DATA DEALLOCATION */
     // Commands
@@ -1185,4 +1196,19 @@ void destructCommand(Command *cmd) {
 
     // Deallocate the command
     free(cmd);
+}
+
+/**
+ * Processes commands on the table
+ * @param cmdSeq Sequence of commands to process
+ * @param table Table with data to work with
+ * @return Error information
+ */
+ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
+    ErrorInfo err = {.error = false};
+
+    (void)cmdSeq;
+    (void)table;
+
+    return err;
 }
