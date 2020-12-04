@@ -173,6 +173,8 @@ CommandSequence *createCmdSeq();
 Command *createCmd();
 void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
 void convertTypesInCommandParams(CommandSequence *cmdSeq);
+void destructCommandSequence(CommandSequence *cmdSeq);
+void destructCommand(Command *cmd);
 
 /**
  * The main function
@@ -218,6 +220,7 @@ int main(int argc, char **argv) {
             writeErrorMessage("Format prikazu ve vstupnim argumentu je chybny.");
         }
 
+        destructCommandSequence(cmdSeq);
         return EXIT_FAILURE;
     }
     skippedArgs += 1;
@@ -251,6 +254,10 @@ int main(int argc, char **argv) {
 
     // Close the read file
     fclose(fileRead);
+
+    /* HELP DATA DEALLOCATION */
+    // Commands
+    destructCommandSequence(cmdSeq);
 
     /* OUTPUT SAVING */
     // Open the file for writing
@@ -461,15 +468,17 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                         // Reset parameter string iteration var
                         cmdI = 0;
                     } else {
-                        // Resize string parameters by 1 for the saving of the next char
+                        // Resize string parameters to cmd + 2 for the saving of the next char
+                        // cmd + 2: indexing from 0 and space for '\0'
                         // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                         char **param = &(cmd->strParams[paramI - 1]);
-                        if ((*param = realloc(*param, strlen(*param) + 1)) == NULL) {
+                        if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                             return NULL;
                         }
 
                         // Save the char
                         (*param)[cmdI] = string[i];
+                        (*param)[cmdI + 1] = '\0';
                     }
 
                     i++;
@@ -489,15 +498,17 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             if (paramI == 0) {
                 cmd->name[cmdI] = string[i];
             } else {
-                // Resize string parameters by 1 for the saving of the next char
+                // Resize string parameters to cmd + 2 for the saving of the next char
+                // cmd + 2: indexing from 0 and space for '\0'
                 // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                 char **param = &(cmd->strParams[paramI - 1]);
-                if ((*param = realloc(*param, strlen(*param) + 1)) == NULL) {
+                if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                     return NULL;
                 }
 
                 // Save the char
                 (*param)[cmdI] = string[i];
+                (*param)[cmdI + 1] = '\0';
             }
 
             // Increment command name/parameter string iteration var
@@ -1056,6 +1067,7 @@ CommandSequence *createCmdSeq() {
         return NULL;
     }
 
+    // Set default values
     cmdSeq->firstCmd = NULL;
     cmdSeq->lastCmd = NULL;
 
@@ -1072,14 +1084,19 @@ Command *createCmd() {
         return NULL;
     }
 
+    // Set default values
     memset(cmd->name, '\0', COMMAND_NAME_SIZE + 1);
     memset(cmd->intParams, BAD_ROW_COL_NUMBER, sizeof(int) * COMMAND_PARAMS_SIZE);
     cmd->next = NULL;
 
+    // Allocate space for string parameters
     for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
         if ((cmd->strParams[i] = malloc(sizeof(char))) == NULL) {
             return NULL;
         }
+
+        // Set value to allocated space (string will be detected well)
+        cmd->strParams[i][0] = '\0';
     }
 
     return cmd;
@@ -1126,4 +1143,46 @@ void convertTypesInCommandParams(CommandSequence *cmdSeq) {
         // Move to the next command
         cmd = cmd->next;
     }
+}
+
+/**
+ * Destructs command sequence
+ * @param cmdSeq Command sequence to be destructed
+ */
+void destructCommandSequence(CommandSequence *cmdSeq) {
+    Command *cmd = cmdSeq->firstCmd;
+    while (cmd != NULL) {
+        // Backup next
+        Command *next = cmd->next;
+
+        // Destruct actual command
+        destructCommand(cmd);
+
+        // Load next from backup
+        cmd = next;
+    }
+
+    // Deallocate the sequence
+    cmdSeq->firstCmd = NULL;
+    cmdSeq->lastCmd = NULL;
+    free(cmdSeq);
+}
+
+/**
+ * Destructs command
+ * @param cmd Command to be destructed
+ */
+void destructCommand(Command *cmd) {
+    // Set static memory fields to empty states
+    memset(cmd->name, '\0', COMMAND_NAME_SIZE);
+    memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
+    cmd->next = NULL;
+
+    // Free dynamic memory field
+    for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
+        free(cmd->strParams[i]);
+    }
+
+    // Deallocate the command
+    free(cmd);
 }
