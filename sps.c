@@ -45,6 +45,14 @@
  * @def SPECIAL_CHARS List of special characters (they must be escaped)
  */
 #define SPECIAL_CHARS "\"\\"
+/**
+ * @def COMMAND_NAME_SIZE Maximum string length of the command name (without \0)
+ */
+#define COMMAND_NAME_SIZE 6
+/**
+ * @def COMMAND_PARAMS_SIZE Size of array with command parameters (maximum number of parameters, resp.)
+ */
+#define COMMAND_PARAMS_SIZE 4
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -102,12 +110,23 @@ typedef struct table {
  * @field name Command's name (selections have the same name "select")
  * @field intParams Parameters of type integer
  * @field strParams Parameters of type string
+ * @field next Pointer to the next command in the linked-list
  */
 typedef struct command {
-    char *name;
-    int intParams[4];
-    char *strParams[4];
+    char name[COMMAND_NAME_SIZE + 1];
+    int intParams[COMMAND_PARAMS_SIZE];
+    char *strParams[COMMAND_PARAMS_SIZE];
+    struct command *next;
 } Command;
+/**
+ * @typedef Sequence of loaded commands
+ * @field firstCmd Pointer to the first command of the linked-list
+ * @field lastCmd Pointer to the last command of the linked-list
+ */
+typedef struct commandSequence {
+    Command *firstCmd;
+    Command *lastCmd;
+} CommandSequence;
 
 // Input/output functions
 Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag);
@@ -135,6 +154,10 @@ void destructRow(Row *row);
 void destructCell(Cell *cell);
 ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, const char *newValue);
 char *getCellValue(Table *table, unsigned int row, unsigned int column);
+// Functions for working with commands
+CommandSequence *createCmdSeq();
+Command *createCmd();
+void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
 
 /**
  * The main function
@@ -883,4 +906,58 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
  */
 char *getCellValue(Table *table, unsigned int row, unsigned int column) {
     return table->rows[row].cells[column].data;
+}
+
+/**
+ * Creates command sequence
+ * @return Pointer to the newly created command sequence
+ */
+CommandSequence *createCmdSeq() {
+    CommandSequence *cmdSeq;
+    if ((cmdSeq = malloc(sizeof(CommandSequence))) == NULL) {
+        return NULL;
+    }
+
+    cmdSeq->firstCmd = NULL;
+    cmdSeq->lastCmd = NULL;
+
+    return cmdSeq;
+}
+
+/**
+ * Create a new command
+ * @return Pointer to the new command
+ */
+Command *createCmd() {
+    Command *cmd;
+    if ((cmd = malloc(sizeof(Command))) == NULL) {
+        return NULL;
+    }
+
+    memset(cmd->name, '\0', COMMAND_NAME_SIZE + 1);
+    memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
+    cmd->next = NULL;
+
+    return cmd;
+}
+
+/**
+ * Adds a new command to the command sequence
+ * @param cmdSeq Command sequence to edit
+ * @param cmd New command to add
+ */
+void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd) {
+    // Behaviour is different for the first command
+    if (cmdSeq->firstCmd == NULL) {
+        cmdSeq->firstCmd = cmd;
+
+        return;
+    }
+
+    // Add command to the linked-list (link it to the last command)
+    Command *lastCmd = cmdSeq->lastCmd;
+    lastCmd->next = cmd;
+
+    // Set the new command as the last of the sequence
+    cmdSeq->lastCmd = cmd;
 }
