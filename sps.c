@@ -1150,6 +1150,11 @@ void convertTypesInCommandParams(CommandSequence *cmdSeq) {
  * @param cmdSeq Command sequence to be destructed
  */
 void destructCommandSequence(CommandSequence *cmdSeq) {
+    // Command sequence has been already freed
+    if (cmdSeq == NULL) {
+        return;
+    }
+
     Command *cmd = cmdSeq->firstCmd;
     while (cmd != NULL) {
         // Backup next
@@ -1173,6 +1178,11 @@ void destructCommandSequence(CommandSequence *cmdSeq) {
  * @param cmd Command to be destructed
  */
 void destructCommand(Command *cmd) {
+    // Command sequence has been already freed
+    if (cmd == NULL) {
+        return;
+    }
+
     // Set static memory fields to empty states
     memset(cmd->name, '\0', COMMAND_NAME_SIZE);
     memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
