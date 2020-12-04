@@ -472,10 +472,11 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                         // cmd + 2: indexing from 0 and space for '\0'
                         // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                         char **param = &(cmd->strParams[paramI - 1]);
-                        char *tmp = *param;
-                        if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
-                            free(tmp);
+                        char *tmp;
+                        if ((tmp = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                             return NULL;
+                        } else {
+                            *param = tmp;
                         }
 
                         // Save the char
@@ -504,10 +505,11 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                 // cmd + 2: indexing from 0 and space for '\0'
                 // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                 char **param = &(cmd->strParams[paramI - 1]);
-                char *tmp = *param;
-                if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
-                    free(tmp);
+                char *tmp;
+                if ((tmp = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                     return NULL;
+                } else {
+                    *param = tmp;
                 }
 
                 // Save the char
