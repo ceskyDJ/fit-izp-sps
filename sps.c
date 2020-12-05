@@ -219,7 +219,7 @@ void destructSelection(Selection *sel);
 Variables *createVars();
 void destructVars(Variables *vars);
 // Selection and data manipulation functions (implementations of the commands)
-ErrorInfo test(Command *cmd, Table *table);
+ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables);
 
 /**
  * The main function
@@ -1277,8 +1277,8 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {};
-    ErrorInfo (*functions[])() = {};
+    char *names[] = {"test"};
+    ErrorInfo (*functions[])() = {test};
 
     // Preparation of selection and variables
     Selection *sel;
@@ -1297,11 +1297,50 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
         return err;
     }
 
-    // TODO: implement command choose and call
-    (void)cmdSeq;
-    (void)table;
-    (void)names;
-    (void)functions;
+    // Apply each command from the sequence
+    Command *cmd = cmdSeq->firstCmd;
+    while (cmd != NULL) {
+        // Find related function
+        int found = -1;
+        for (unsigned i = 0; i < sizeof(names) / sizeof(char *); i++) {
+            if (strstr(names[i], cmd->name)) {
+                found = (int)i;
+                break;
+            }
+        }
+
+        // Apply command by its type
+        if (cmd->type == SELECTION_COMMAND) {
+            // Selection commands are applied everytime once
+            functions[found](cmd, table, sel, vars);
+        } else {
+            // Other commands must be called after selection
+            if (sel->rowFrom == 0) {
+                err.error = true;
+                err.message = "Pred volanim editacnich prikazu je nutne nejprve provest vyber.";
+
+                return err;
+            }
+
+            // Other command are applied for every selected cell
+            for (unsigned j = sel->rowFrom; j <= sel->rowTo; j++) {
+                for (unsigned k = sel->colFrom; k <= sel->colTo; k++) {
+                    functions[found](cmd, table, sel, vars);
+                }
+            }
+        }
+
+        // Commands isn't implemented
+        if (found < 0) {
+            err.error = true;
+            err.message = "Byl zadan prikaz, ktery neni definovan.";
+
+            return err;
+        }
+
+        // Move to the next command in sequence
+        cmd = cmd->next;
+    }
 
     // Selection and temporary variables deallocation
     destructSelection(sel);
@@ -1385,13 +1424,16 @@ void destructVars(Variables *vars) {
 }
 
 // TODO: This is only test command, remove it after testing
-// Full params: ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables) {
-ErrorInfo test(Command *cmd, Table *table) {
+ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables) {
     ErrorInfo err = {.error = false};
 
-    // TODO: Implement information
-    (void)cmd;
-    (void)table;
+    // Not used parameters
+    (void)selection;
+    (void)variables;
+
+    printf("First str param: '%s'\n", cmd->strParams[0]);
+    printf("First int param: '%d'\n", cmd->intParams[0]);
+    printf("[0,0] = %s", getCellValue(table, 0, 0));
 
     return err;
 }
