@@ -1683,7 +1683,7 @@ ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
     printf("First str param: '%s'\n", cmd->strParams[0]);
     printf("First int param: '%d'\n", cmd->intParams[0]);
-    printf("[%d,%d] = %s", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom, sel->colFrom));
+    printf("[%u,%u] = %s\n", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom, sel->colFrom));
 
     return err;
 }
