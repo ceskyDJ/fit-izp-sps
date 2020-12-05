@@ -223,6 +223,7 @@ void destructVars(Variables *vars);
 ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo findSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Data manipulation functions (implementations of the commands)
 ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
@@ -489,6 +490,8 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
     if ((cmd = createCmd()) == NULL) {
         return NULL;
     }
+
+    // TODO: add border chars support for text parameters
 
     // Parse string to commands
     unsigned i, cmdI, paramI;
@@ -1286,8 +1289,8 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"select", "min", "max", "test"};
-    ErrorInfo (*functions[])() = {standardSelect, minMaxSelect, minMaxSelect, test};
+    char *names[] = {"select", "min", "max", "find", "test"};
+    ErrorInfo (*functions[])() = {standardSelect, minMaxSelect, minMaxSelect, findSelect, test};
 
     // Preparation of selection and variables
     Selection *sel;
@@ -1618,6 +1621,45 @@ ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *va
     sel->rowTo = (unsigned)coords.row;
     sel->colFrom = (unsigned)coords.col;
     sel->colTo = (unsigned)coords.col;
+
+    return err;
+}
+
+/**
+ * Applies find select - it selects first cell contains some value
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo findSelect(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
+
+    // First parameter can't be empty
+    if (streq(cmd->strParams[0], "")) {
+        err.error = true;
+        err.message = "Funkce [find STR] vyzaduje jako STR neprazdny retezec";
+
+        return err;
+    }
+
+    // Find the cell with STR
+    for (unsigned i = sel->rowFrom; i <= sel->rowTo; i++) {
+        for (unsigned j = sel->colFrom; j <= sel->colTo; j++) {
+            if (strstr(getCellValue(table, i, j), cmd->strParams[0]) != NULL) {
+                sel->rowFrom = i;
+                sel->rowTo = i;
+                sel->colFrom = j;
+                sel->colTo = j;
+
+                return err;
+            }
+        }
+    }
 
     return err;
 }
