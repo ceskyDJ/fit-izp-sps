@@ -214,12 +214,16 @@ void destructCommand(Command *cmd);
 ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table);
 // Functions for working with selection
 Selection *createSelection();
+void revertSelectionFromBackup(Selection *sel, Selection *backup);
 void destructSelection(Selection *sel);
 // Functions for working with temporary variables
 Variables *createVars();
 void destructVars(Variables *vars);
-// Selection and data manipulation functions (implementations of the commands)
-ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables);
+// Selection functions (implementations of the commands)
+ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
+// Data manipulation functions (implementations of the commands)
+ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars);
 
 /**
  * The main function
@@ -1277,8 +1281,8 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"test"};
-    ErrorInfo (*functions[])() = {test};
+    char *names[] = {"select", "test"};
+    ErrorInfo (*functions[])() = {standardSelect, test};
 
     // Preparation of selection and variables
     Selection *sel;
@@ -1369,6 +1373,18 @@ Selection *createSelection() {
 }
 
 /**
+ * Reverts selection from backup
+ * @param sel Selection to revert
+ * @param backup Backup - selection with values to revert
+ */
+void revertSelectionFromBackup(Selection *sel, Selection *backup) {
+    sel->rowFrom = backup->rowFrom;
+    sel->rowTo = backup->rowTo;
+    sel->colFrom = backup->colFrom;
+    sel->colTo = backup->colTo;
+}
+
+/**
  * Destructs selection
  * @param sel Selection to be destructed
  */
@@ -1423,17 +1439,126 @@ void destructVars(Variables *vars) {
     free(vars);
 }
 
-// TODO: This is only test command, remove it after testing
-ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables) {
+/**
+ * Applies standard select ([R,C] and its subtypes)
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars
+ * @return Error information
+ */
+ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Aliases for better code readability
+    int row = cmd->intParams[0];
+    int col = cmd->intParams[1];
+    int rowSecond = cmd->intParams[2];
+    int colSecond = cmd->intParams[3];
+
+    // [_]
+    if (row == LAST_ROW_COL_NUMBER && col == BAD_ROW_COL_NUMBER) {
+        // Selection hasn't been saved yet
+        if (vars->sel == NULL) {
+            err.error = true;
+            err.message = "Vyber z docastne promenne neni mozne nacist, protoze promenna zadny vyber neobsahuje.";
+
+            return err;
+        }
+
+        revertSelectionFromBackup(sel, vars->sel);
+
+        return err;
+    }
+
+    // Bad parameters for [R,C]
+    if (row == BAD_ROW_COL_NUMBER || col == BAD_ROW_COL_NUMBER) {
+        err.error = true;
+        err.message = "Funkce [R,C] vyzaduje, aby bylo R i C prirozene cislo nebo znak '_'.";
+
+        return err;
+    }
+
+    // [R1,C1,R2,R2] (it solves another function)
+    if (rowSecond != BAD_ROW_COL_NUMBER && colSecond != BAD_ROW_COL_NUMBER) {
+        return windowSelect(cmd, table, sel, vars);
+    }
+
+    // [R,C]
+    if (row != LAST_ROW_COL_NUMBER) {
+        // R != '_'
+        sel->rowFrom = sel->rowTo = row;
+    } else {
+        // R == '_'
+        sel->rowFrom = 1;
+        sel->rowTo = table->size;
+    }
+    if (col != LAST_ROW_COL_NUMBER) {
+        // C != '_'
+        sel->colFrom = sel->colTo = col;
+    } else {
+        // R = '_'
+        sel->colFrom = 1;
+        sel->colTo = table->rows[0].size;
+    }
+
+    return err;
+}
+
+/**
+ * Applies window select ([R1,C1,R2,C2])
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
 
     // Not used parameters
-    (void)selection;
-    (void)variables;
+    (void)vars;
+
+    // Aliases for better code readability
+    int row = cmd->intParams[0];
+    int col = cmd->intParams[1];
+    int rowSecond = cmd->intParams[2];
+    int colSecond = cmd->intParams[3];
+
+    // Bad input parameters
+    if (row > rowSecond || col > colSecond) {
+        err.error = true;
+        err.message = "Funkce [R1,C1,R2,R2] vyzaduje, aby bylo R1 <= R2 a C1 <= C2.";
+
+        return err;
+    }
+    // Bad parameters for [R1,C1,R2,R2]
+    if ((rowSecond != BAD_ROW_COL_NUMBER && colSecond == BAD_ROW_COL_NUMBER) || (rowSecond == BAD_ROW_COL_NUMBER && colSecond != BAD_ROW_COL_NUMBER)) {
+        err.error = true;
+        err.message = "Funkce [R1,C1,R2,R2] vyzaduje, aby bylo R1, C1, R2 i C2 prirozene cislo.";
+
+        return err;
+    }
+
+    // Update selection
+    sel->rowFrom = row;
+    sel->rowTo = (rowSecond != LAST_ROW_COL_NUMBER ? (unsigned)rowSecond : table->size);
+    sel->colFrom = col;
+    sel->colTo = (colSecond != LAST_ROW_COL_NUMBER ? (unsigned)colSecond : table->rows[0].size);
+
+    return err;
+}
+
+// TODO: This is only test command, remove it after testing
+ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
 
     printf("First str param: '%s'\n", cmd->strParams[0]);
     printf("First int param: '%d'\n", cmd->intParams[0]);
-    printf("[0,0] = %s", getCellValue(table, 0, 0));
+    printf("[%d,%d] = %s", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom - 1, sel->colFrom - 1));
 
     return err;
 }
