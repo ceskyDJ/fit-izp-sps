@@ -1099,7 +1099,8 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
     ErrorInfo err = {.error = false};
 
     // Get cell and new value's size for easier manipulation
-    Cell *cell = &(table->rows[row].cells[column]);
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    Cell *cell = &(table->rows[row - 1].cells[column - 1]);
     int newSize = (int)strlen(newValue);
 
     // Resize for the new value
@@ -1127,7 +1128,8 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
  * @return Value of the cell
  */
 char *getCellValue(Table *table, unsigned int row, unsigned int column) {
-    return table->rows[row].cells[column].data;
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    return table->rows[row - 1].cells[column - 1].data;
 }
 
 /**
@@ -1558,7 +1560,7 @@ ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
     printf("First str param: '%s'\n", cmd->strParams[0]);
     printf("First int param: '%d'\n", cmd->intParams[0]);
-    printf("[%d,%d] = %s", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom - 1, sel->colFrom - 1));
+    printf("[%d,%d] = %s", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom, sel->colFrom));
 
     return err;
 }
