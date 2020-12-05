@@ -230,7 +230,6 @@ ErrorInfo drow(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
-ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1310,9 +1309,9 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "test"};
+    char *names[] = {"select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol"};
     ErrorInfo (*functions[])() = {
-        standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, test
+        standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol
     };
 
     // Preparation of selection and variables
@@ -1869,20 +1868,6 @@ ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
     // Delete column
     deleteColumnFromTable(table, sel->colFrom);
-
-    return err;
-}
-
-// TODO: This is only test command, remove it after testing
-ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
-    ErrorInfo err = {.error = false};
-
-    // Not used parameters
-    (void)vars;
-
-    printf("First str param: '%s'\n", cmd->strParams[0]);
-    printf("First int param: '%d'\n", cmd->intParams[0]);
-    printf("[%u,%u] = %s\n", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom, sel->colFrom));
 
     return err;
 }
