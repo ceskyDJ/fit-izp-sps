@@ -66,6 +66,14 @@
  * @def BAD_ROW_COL_NUMBER Number represents bad number of row or column provided in input
  */
 #define BAD_ROW_COL_NUMBER 0
+/**
+ * @def CLASSIC_COMMAND Classic data manipulation command
+ */
+#define CLASSIC_COMMAND true
+/**
+ * @def SELECTION_COMMAND Command for editing selection
+ */
+#define SELECTION_COMMAND false
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -120,12 +128,14 @@ typedef struct table {
 } Table;
 /**
  * @typedef Command for data selection or manipulating with them
+ * @field type Type of the command (classic or selection)
  * @field name Command's name (selections have the same name "select")
  * @field intParams Parameters of type integer
  * @field strParams Parameters of type string
  * @field next Pointer to the next command in the linked-list
  */
 typedef struct command {
+    bool type;
     char name[COMMAND_NAME_SIZE + 1];
     int intParams[COMMAND_PARAMS_SIZE];
     char *strParams[COMMAND_PARAMS_SIZE];
@@ -448,17 +458,15 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             // Reset parameter string iteration var
             cmdI = 0;
         } else {
-            // Selection commands
-            if (cmdI == 0 && string[i] == '[') {
+            // Selection commands: [R, C], [R1,C1,R2,C2], [_] and [_,_]
+            if (cmdI == 0 && string[i] == '[' && (isdigit(string[i + 1]) || string[i + 1] == '_')) {
                 // Skip the '[' char
                 i++;
 
-                // Classic selection
-                if (isdigit(string[i]) || string[i] == '_') {
-                    // Set a name (this type of commands doesn't have a name in input string)
-                    memcpy(cmd->name, "select", 7);
-                    paramI = 1;
-                }
+                // Set a type and a name (this type of commands doesn't have a name in input string)
+                cmd->type = SELECTION_COMMAND;
+                memcpy(cmd->name, "select", 7);
+                paramI = 1;
 
                 // Load parameters
                 while (string[i] != ']' && string[i] != ';') {
@@ -496,9 +504,20 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                 continue;
             }
 
-            // Data processing commands
+            // Skip ']' char at the end of selection commands
+            if (string[i] == ']' && (string[i + 1] == ' ' || string[i + 1] == ';')) {
+                continue;
+            }
+
+            // Data processing commands and named selection commands ([min], [max], [find STR], [set])
             // Loading command name
             if (paramI == 0) {
+                // Skip '[' char at the start of selection commands and set command type
+                if (cmdI == 0 && string[i] == '[') {
+                    cmd->type = SELECTION_COMMAND;
+                    continue;
+                }
+
                 cmd->name[cmdI] = string[i];
             } else {
                 // Resize string parameters to cmd + 2 for the saving of the next char
@@ -1091,6 +1110,7 @@ Command *createCmd() {
     }
 
     // Set default values
+    cmd->type = CLASSIC_COMMAND;
     memset(cmd->name, '\0', COMMAND_NAME_SIZE + 1);
     memset(cmd->intParams, BAD_ROW_COL_NUMBER, sizeof(int) * COMMAND_PARAMS_SIZE);
     cmd->next = NULL;
