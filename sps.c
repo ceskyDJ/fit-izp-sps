@@ -1854,9 +1854,9 @@ ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
 /**
  * Deletes selected columns
- * @param cmd Command that is applying
+ * @param cmd Command that is applying (not used)
  * @param table Table with data
- * @param sel Selection (not used)
+ * @param sel Selection
  * @param vars Temporary vars (not used)
  * @return Error information
  */
@@ -1864,11 +1864,11 @@ ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
 
     // Not used parameters
-    (void)sel;
+    (void)cmd;
     (void)vars;
 
-    (void)cmd;
-    (void)table;
+    // Delete column
+    deleteColumnFromTable(table, sel->colFrom);
 
     return err;
 }
