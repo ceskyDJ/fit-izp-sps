@@ -74,6 +74,10 @@
  * @def SELECTION_COMMAND Command for editing selection
  */
 #define SELECTION_COMMAND false
+/**
+ * @def NUMBER_OF_VARIABLES Number of temporary data variables (_0 to _9)
+ */
+#define NUMBER_OF_VARIABLES 10
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -150,6 +154,28 @@ typedef struct commandSequence {
     Command *firstCmd;
     Command *lastCmd;
 } CommandSequence;
+/**
+ * @typedef Selection of the table cells
+ * @field rowFrom First row coordinate
+ * @field rowTo Second row coordinate
+ * @field colFrom First column coordinate
+ * @field colTo Second column coordinate
+ */
+typedef struct selection {
+    unsigned int rowFrom;
+    unsigned int rowTo;
+    unsigned int colFrom;
+    unsigned int colTo;
+} Selection;
+/**
+ * @typedef Temporary variables _, _0 to _9
+ * @field sel Selection variable (_)
+ * @field data Data variables (_0 to _9)
+ */
+typedef struct variables {
+    Selection *sel;
+    char *data[NUMBER_OF_VARIABLES];
+} Variables;
 
 // Input/output functions
 Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag);
@@ -185,8 +211,15 @@ void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd);
 void convertTypesInCommandParams(CommandSequence *cmdSeq);
 void destructCommandSequence(CommandSequence *cmdSeq);
 void destructCommand(Command *cmd);
-// Data processing functions
 ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table);
+// Functions for working with selection
+Selection *createSelection();
+void destructSelection(Selection *sel);
+// Functions for working with temporary variables
+Variables *createVars();
+void destructVars(Variables *vars);
+// Selection and data manipulation functions (implementations of the commands)
+ErrorInfo test(Command *cmd, Table *table);
 
 /**
  * The main function
@@ -1243,7 +1276,121 @@ void destructCommand(Command *cmd) {
 ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
+    // Functions known by the system
+    char *names[] = {};
+    ErrorInfo (*functions[])() = {};
+
+    // Preparation of selection and variables
+    Selection *sel;
+    if ((sel = createSelection()) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro selekci.";
+
+        return err;
+    }
+
+    Variables *vars;
+    if ((vars = createVars()) == NULL) {
+        err.error = true;
+        err.message = "Nepodarilo se alokovat pamet pro docasne promenne.";
+
+        return err;
+    }
+
+    // TODO: implement command choose and call
     (void)cmdSeq;
+    (void)table;
+    (void)names;
+    (void)functions;
+
+    // Selection and temporary variables deallocation
+    destructSelection(sel);
+    destructVars(vars);
+
+    return err;
+}
+
+/**
+ * Creates a new selection
+ * @return Pointer to the new selection or NULL if memory problems occurred
+ */
+Selection *createSelection() {
+    Selection *sel;
+    if ((sel = malloc(sizeof(Selection))) == NULL) {
+        return NULL;
+    }
+
+    // Set data to default values
+    sel->rowFrom = 0;
+    sel->rowTo = 0;
+    sel->colFrom = 0;
+    sel->colTo = 0;
+
+    return sel;
+}
+
+/**
+ * Destructs selection
+ * @param sel Selection to be destructed
+ */
+void destructSelection(Selection *sel) {
+    // Selection has been already destructed
+    if (sel == NULL) {
+        return;
+    }
+
+    free(sel);
+}
+
+/**
+ * Creates a new variables
+ * @return Pointer to the new variables or NULL if memory problems occurred
+ */
+Variables *createVars() {
+    Variables *vars;
+    if ((vars = malloc(sizeof(Variables))) == NULL) {
+        return NULL;
+    }
+
+    // Data default values
+    vars->sel = NULL;
+    for (unsigned i = 0; i < NUMBER_OF_VARIABLES; i++) {
+        if ((vars->data[i] = malloc(sizeof(char))) == NULL) {
+            return NULL;
+        }
+
+        // Set value to allocated space (string will be detected well)
+        vars->data[i][0] = '\0';
+    }
+
+    return vars;
+}
+
+/**
+ * Destructs variables
+ * @param vars Variables to be destructed
+ */
+void destructVars(Variables *vars) {
+    // Variables has been already destructed
+    if (vars == NULL) {
+        return;
+    }
+
+    // Deallocate each data variable
+    for (unsigned i = 0; i < NUMBER_OF_VARIABLES; i++) {
+        free(vars->data[i]);
+    }
+
+    free(vars);
+}
+
+// TODO: This is only test command, remove it after testing
+// Full params: ErrorInfo test(Command *cmd, Table *table, Selection *selection, Variables *variables) {
+ErrorInfo test(Command *cmd, Table *table) {
+    ErrorInfo err = {.error = false};
+
+    // TODO: Implement information
+    (void)cmd;
     (void)table;
 
     return err;
