@@ -789,7 +789,7 @@ ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
 
     // Free up space on specified position
     for (unsigned i = table->size; i > position; i--) {
-        table->rows[i + 1] = table->rows[i];
+        table->rows[i] = table->rows[i - 1];
     }
 
     // Insert the row to the specified position
@@ -848,7 +848,7 @@ ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
 
     // Free up the space on specified position
     for (unsigned i = row->size; i > position; i--) {
-        row->cells[i + 1] = row->cells[i];
+        row->cells[i] = row->cells[i - 1];
     }
 
     // Insert the cell to the specified position
@@ -888,7 +888,7 @@ ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position) {
 
     // Free up the space on specified position
     for (unsigned i = cell->size; i > position; i--) {
-        cell->data[i + 1] = cell->data[i];
+        cell->data[i] = cell->data[i - 1];
     }
 
     // Append char to the cell data (cell.size == last index + 1)
