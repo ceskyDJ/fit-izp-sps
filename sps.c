@@ -222,8 +222,11 @@ void destructVars(Variables *vars);
 // Selection functions (implementations of the commands)
 ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Data manipulation functions (implementations of the commands)
 ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars);
+// Help functions
+bool isValidNumber(char *number);
 
 /**
  * The main function
@@ -1283,8 +1286,8 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"select", "test"};
-    ErrorInfo (*functions[])() = {standardSelect, test};
+    char *names[] = {"select", "min", "max", "test"};
+    ErrorInfo (*functions[])() = {standardSelect, minMaxSelect, minMaxSelect, test};
 
     // Preparation of selection and variables
     Selection *sel;
@@ -1551,6 +1554,71 @@ ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *va
     return err;
 }
 
+/**
+ * Applies minimum/maximum select - it selects cell with minimum/maximum value
+ * @param cmd Command that is applying (not used)
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)cmd;
+    (void)vars;
+
+    // This commands must be called after selection
+    if (sel->rowFrom == 0) {
+        err.error = true;
+        err.message = "Pred volanim prikazu [min] a [max] je nutne nejprve provest vyber.";
+
+        return err;
+    }
+
+    // Prepare min/max cell's coords and value
+    struct {
+        int row;
+        int col;
+    } coords;
+    coords.row = -1;
+    coords.col = -1;
+    double actualMinMax;
+
+    // Find minimum/maximum
+    for (unsigned i = sel->rowFrom; i <= sel->rowTo; i++) {
+        for (unsigned j = sel->colFrom; j <= sel->colTo; j++) {
+            char *value = getCellValue(table, i, j);
+            if (isValidNumber(value)) {
+                double number = strtod(value, NULL);
+                if (coords.row == -1 || (streq(cmd->name, "min") && number < actualMinMax) || (streq(cmd->name, "max") && number > actualMinMax)) {
+                    // Save the new minimum/maximum
+                    coords.row = (int)i;
+                    coords.col = (int)j;
+                    actualMinMax = number;
+                }
+            }
+        }
+    }
+
+    // No numeric values found
+    if (coords.row == -1) {
+        err.error = true;
+        err.message = "Vyber neobsahuje zadne numericke bunky, selekci [min] nebo [max] neni mozne provest.";
+
+        return err;
+    }
+
+    // Update selection
+    sel->rowFrom = (unsigned)coords.row;
+    sel->rowTo = (unsigned)coords.row;
+    sel->colFrom = (unsigned)coords.col;
+    sel->colTo = (unsigned)coords.col;
+
+    return err;
+}
+
 // TODO: This is only test command, remove it after testing
 ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
@@ -1563,4 +1631,24 @@ ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     printf("[%d,%d] = %s", sel->rowFrom, sel->colFrom, getCellValue(table, sel->rowFrom, sel->colFrom));
 
     return err;
+}
+
+/**
+ * Checks if the string contains valid number
+ * @param number String for testing
+ * @return Is valid number in the string?
+ */
+bool isValidNumber(char *number) {
+    bool decimalPoint = false; // Was decimal point found?
+    for (int i = 0; i < (int) strlen(number); i++) {
+        if (((number[i] < '0') || (number[i] > '9')) && (i == 0 && (number[i] != '-'))) {
+            if (number[i] == '.' && decimalPoint == false) {
+                decimalPoint = true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
