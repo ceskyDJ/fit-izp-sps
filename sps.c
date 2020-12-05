@@ -195,7 +195,6 @@ ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position);
 ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position);
 void deleteRowFromTable(Table *table, unsigned int position);
 void deleteColumnFromTable(Table *table, unsigned int columnNumber);
-void deleteCellFromTable(Table *table, unsigned int position);
 ErrorInfo alignRowSizes(Table *table);
 void trimRows(Table *table);
 ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns);
@@ -368,7 +367,7 @@ Table *loadTableFromFile(FILE *file, char *delimiters, signed char *flag) {
         }
 
         // Add the row at the end of the table (table->size == last index + 1)
-        if ((addRowToTable(table, row, table->size)).error) {
+        if ((addRowToTable(table, row, table->size + 1)).error) {
             return NULL;
         }
     }
@@ -404,7 +403,7 @@ Row *loadRowFromFile(FILE *file, char *delimiters, signed char *flag) {
         }
 
         // Add the cell to the end of the row (row->size == last index + 1)
-        if ((addCellToRow(row, cell, row->size)).error) {
+        if ((addCellToRow(row, cell, row->size + 1)).error) {
             return NULL;
         }
     }
@@ -453,7 +452,7 @@ Cell *loadCellFromFile(FILE *file, char *delimiters, signed char *flag) {
                 ungetc(nextC, file); // Put the char back to the scope
             }
         } else if (!strc(SPECIAL_CHARS, c) || prevC == '\\'){
-            addCharToCell(cell, (char)c, cell->size);
+            addCharToCell(cell, (char)c, cell->size + 1);
         }
 
         prevC = c;
@@ -769,11 +768,14 @@ Cell *copyCell(const Cell *sourceCell) {
  * Adds a row to a table
  * @param table Table to edit
  * @param row Row to add to the table
- * @param position Position in the table (0 = first)
+ * @param position Position in the table (1 = first)
  * @return Error information
  */
 ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
     ErrorInfo err = {.error = false};
+
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    position--;
 
     // Resizing table if needed
     if (table->capacity < (table->size + 1)) {
@@ -805,16 +807,19 @@ ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
  * Adds a column to the table (inserts cell with the same data to all of the rows)
  * @param table Table to edit
  * @param cell Cell to insert
- * @param position Position in the table (0 = first)
+ * @param position Position in the table (1 = first)
  * @return Error information
  */
 ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
     ErrorInfo err = {.error = false};
 
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    position--;
+
     // Add cell to every row at specified position
     for (unsigned i = 0; i < table->size; i++) {
         Cell *cellCopy = copyCell(cell);
-        if ((err = addCellToRow(&(table->rows[i]), cellCopy, position)).error) {
+        if ((err = addCellToRow(&(table->rows[i]), cellCopy, position + 1)).error) {
             return err;
         }
     }
@@ -828,11 +833,14 @@ ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
  * Adds a cell to a row
  * @param row Row to edit
  * @param cell Cell to add to the row
- * @param position Position in the row (0 = first)
+ * @param position Position in the row (1 = first)
  * @return Error information
  */
 ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
     ErrorInfo err = {.error = false};
+
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    position--;
 
     // Resizing the row if needed
     if (row->capacity < (row->size + 1)) {
@@ -864,11 +872,14 @@ ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
  * Adds a char to the cell
  * @param cell Cell to edit
  * @param c Char to insert
- * @param position Position in the cell (0 = first)
+ * @param position Position in the cell (1 = first)
  * @return Error information
  */
 ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position) {
     ErrorInfo err = {.error = false};
+
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    position--;
 
     // Resize data for the cell if needed
     if (cell->capacity < (cell->size + 1)) {
@@ -901,11 +912,12 @@ ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position) {
 /**
  * Deletes the row from the table
  * @param table Table to edit
- * @param position Position with the row to delete
+ * @param position Position with the row to delete (1 = first)
  */
 void deleteRowFromTable(Table *table, unsigned int position) {
     // Move rows to replace and fill the deleted position
-    for (unsigned i = (int)position; i < table->size - 1; i++) {
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    for (unsigned i = (int)position - 1; i < table->size - 1; i++) {
         table->rows[i] = table->rows[i + 1];
     }
 
@@ -916,9 +928,12 @@ void deleteRowFromTable(Table *table, unsigned int position) {
 /**
  * Deletes the column from the table
  * @param table Table to edit
- * @param columnNumber Number of column to delete
+ * @param columnNumber Number of column to delete (1 = first)
  */
 void deleteColumnFromTable(Table *table, unsigned int columnNumber) {
+    // There are coordinates from the real world in row and column (indexed from 1) --> - 1
+    columnNumber--;
+
     // Delete the cell on position columnNumber from every row of the table
     for (unsigned i = 0; i < table->size; i++) {
         // Move cells to replace and fill the deleted position
@@ -959,7 +974,7 @@ ErrorInfo alignRowSizes(Table *table) {
                 return err;
             }
 
-            if ((err = addCellToRow(&(table->rows[i]), cell, j)).error) {
+            if ((err = addCellToRow(&(table->rows[i]), cell, j + 1)).error) {
                 return err;
             }
         }
@@ -990,7 +1005,7 @@ void trimRows(Table *table) {
 
     // Delete all unnecessary columns
     for (unsigned j = table->rows[0].size; j > mostColumns; j--) {
-        deleteColumnFromTable(table, j);
+        deleteColumnFromTable(table, j + 1);
     }
 }
 
@@ -1017,7 +1032,7 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
         }
 
         // Add the cell to the row
-        if ((err = addCellToRow(&(table->rows[0]), cell, i)).error) {
+        if ((err = addCellToRow(&(table->rows[0]), cell, i + 1)).error) {
             return err;
         }
     }
@@ -1034,7 +1049,7 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
         }
 
         // Add the row into table
-        if ((err = addRowToTable(table, row, i)).error) {
+        if ((err = addRowToTable(table, row, i + 1)).error) {
             return err;
         }
     }
@@ -1102,8 +1117,8 @@ void destructCell(Cell *cell) {
 /**
  * Sets a new value to the selected cell of the table
  * @param table Table to edit
- * @param row Row selection
- * @param column Column selection
+ * @param row Row selection (1 = first)
+ * @param column Column selection (1 = first)
  * @param newValue New value
  * @return Error information
  */
@@ -1135,8 +1150,8 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
 /**
  * Returns value of the selected cell of the table
  * @param table Table contains the selected cell
- * @param row Selected row
- * @param column Selected column
+ * @param row Selected row (1 = first)
+ * @param column Selected column (1 = first)
  * @return Value of the cell
  */
 char *getCellValue(Table *table, unsigned int row, unsigned int column) {
@@ -1707,7 +1722,7 @@ ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    if ((err = addRowToTable(table, row, sel->rowFrom - 1)).error) {
+    if ((err = addRowToTable(table, row, sel->rowFrom)).error) {
         return err;
     }
     if ((err = alignRowSizes(table)).error) {
@@ -1742,7 +1757,7 @@ ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    if ((err = addRowToTable(table, row, sel->rowTo)).error) {
+    if ((err = addRowToTable(table, row, sel->rowTo + 1)).error) {
         return err;
     }
     if ((err = alignRowSizes(table)).error) {
@@ -1768,7 +1783,7 @@ ErrorInfo drow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     (void)vars;
 
     // Delete row
-    deleteRowFromTable(table, sel->rowFrom - 1);
+    deleteRowFromTable(table, sel->rowFrom);
 
     return err;
 }
