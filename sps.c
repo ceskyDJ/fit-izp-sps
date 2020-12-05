@@ -1715,9 +1715,9 @@ ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
 /**
  * Inserts a row after selected row
- * @param cmd Command that is applying
+ * @param cmd Command that is applying (not used)
  * @param table Table with data
- * @param sel Selection (not used)
+ * @param sel Selection
  * @param vars Temporary vars (not used)
  * @return Error information
  */
@@ -1725,11 +1725,21 @@ ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
 
     // Not used parameters
-    (void)sel;
+    (void)cmd;
     (void)vars;
 
-    (void)cmd;
-    (void)table;
+    // Create empty row
+    Row *row;
+    if ((row = createRow()) == NULL) {
+        err.error = true;
+        err.message = "Pri alokaci pameti pro novy radek doslo k chybe.";
+
+        return err;
+    }
+
+    // Add the row into table
+    addRowToTable(table, row, sel->rowTo);
+    alignRowSizes(table);
 
     return err;
 }
