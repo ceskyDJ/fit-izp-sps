@@ -1491,27 +1491,37 @@ ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *
         return err;
     }
 
-    // [R1,C1,R2,R2] (it solves another function)
     if (rowSecond != BAD_ROW_COL_NUMBER && colSecond != BAD_ROW_COL_NUMBER) {
-        return windowSelect(cmd, table, sel, vars);
+        // [R1,C1,R2,R2] (it solves another function)
+        if((err = windowSelect(cmd, table, sel, vars)).error) {
+            return err;
+        }
+    } else {
+        // [R,C]
+        if (row != LAST_ROW_COL_NUMBER) {
+            // R != '_'
+            sel->rowFrom = sel->rowTo = row;
+        } else {
+            // R == '_'
+            sel->rowFrom = 1;
+            sel->rowTo = table->size;
+        }
+        if (col != LAST_ROW_COL_NUMBER) {
+            // C != '_'
+            sel->colFrom = sel->colTo = col;
+        } else {
+            // R = '_'
+            sel->colFrom = 1;
+            sel->colTo = table->rows[0].size;
+        }
     }
 
-    // [R,C]
-    if (row != LAST_ROW_COL_NUMBER) {
-        // R != '_'
-        sel->rowFrom = sel->rowTo = row;
-    } else {
-        // R == '_'
-        sel->rowFrom = 1;
-        sel->rowTo = table->size;
+    // Resize table if select is bigger than table size
+    if (sel->rowTo > table->size) {
+        resizeTable(table, sel->rowTo, table->rows[0].size);
     }
-    if (col != LAST_ROW_COL_NUMBER) {
-        // C != '_'
-        sel->colFrom = sel->colTo = col;
-    } else {
-        // R = '_'
-        sel->colFrom = 1;
-        sel->colTo = table->rows[0].size;
+    if (sel->colTo > table->rows[0].size) {
+        resizeTable(table, table->size, sel->colTo);
     }
 
     return err;
