@@ -225,6 +225,12 @@ ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *va
 ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo findSelect(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Data manipulation functions (implementations of the commands)
+ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo drow(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo test(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
@@ -1289,8 +1295,10 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"select", "min", "max", "find", "test"};
-    ErrorInfo (*functions[])() = {standardSelect, minMaxSelect, minMaxSelect, findSelect, test};
+    char *names[] = {"select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "test"};
+    ErrorInfo (*functions[])() = {
+        standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, test
+    };
 
     // Preparation of selection and variables
     Selection *sel;
@@ -1670,6 +1678,132 @@ ErrorInfo findSelect(Command *cmd, Table *table, Selection *sel, Variables *vars
             }
         }
     }
+
+    return err;
+}
+
+/**
+ * Inserts row before selected row
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
+
+    return err;
+}
+
+/**
+ * Inserts a row after selected row
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
+
+    return err;
+}
+
+/**
+ * Deletes selected row
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo drow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
+
+    return err;
+}
+
+/**
+ * Insert column before selection
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
+
+    return err;
+}
+
+/**
+ * Insert column after selection
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
+
+    return err;
+}
+
+/**
+ * Deletes selected columns
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection (not used)
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)sel;
+    (void)vars;
+
+    (void)cmd;
+    (void)table;
 
     return err;
 }
