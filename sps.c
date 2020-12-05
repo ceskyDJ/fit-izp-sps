@@ -1321,7 +1321,9 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
         // Apply command by its type
         if (cmd->type == SELECTION_COMMAND) {
             // Selection commands are applied everytime once
-            functions[found](cmd, table, sel, vars);
+            if ((err = functions[found](cmd, table, sel, vars)).error) {
+                return err;
+            }
         } else {
             // Other commands must be called after selection
             if (sel->rowFrom == 0) {
@@ -1334,7 +1336,9 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
             // Other command are applied for every selected cell
             for (unsigned j = sel->rowFrom; j <= sel->rowTo; j++) {
                 for (unsigned k = sel->colFrom; k <= sel->colTo; k++) {
-                    functions[found](cmd, table, sel, vars);
+                    if ((err = functions[found](cmd, table, sel, vars)).error) {
+                        return err;
+                    }
                 }
             }
         }
@@ -1556,7 +1560,7 @@ ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *va
 
 /**
  * Applies minimum/maximum select - it selects cell with minimum/maximum value
- * @param cmd Command that is applying (not used)
+ * @param cmd Command that is applying
  * @param table Table with data
  * @param sel Selection
  * @param vars Temporary vars (not used)
@@ -1566,7 +1570,6 @@ ErrorInfo minMaxSelect(Command *cmd, Table *table, Selection *sel, Variables *va
     ErrorInfo err = {.error = false};
 
     // Not used parameters
-    (void)cmd;
     (void)vars;
 
     // This commands must be called after selection
