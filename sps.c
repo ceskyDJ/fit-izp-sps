@@ -66,6 +66,14 @@
  * @def BAD_ROW_COL_NUMBER Number represents bad number of row or column provided in input
  */
 #define BAD_ROW_COL_NUMBER 0
+/**
+ * @def CLASSIC_COMMAND Classic data manipulation command
+ */
+#define CLASSIC_COMMAND true
+/**
+ * @def SELECTION_COMMAND Command for editing selection
+ */
+#define SELECTION_COMMAND false
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -120,12 +128,14 @@ typedef struct table {
 } Table;
 /**
  * @typedef Command for data selection or manipulating with them
+ * @field type Type of the command (classic or selection)
  * @field name Command's name (selections have the same name "select")
  * @field intParams Parameters of type integer
  * @field strParams Parameters of type string
  * @field next Pointer to the next command in the linked-list
  */
 typedef struct command {
+    bool type;
     char name[COMMAND_NAME_SIZE + 1];
     int intParams[COMMAND_PARAMS_SIZE];
     char *strParams[COMMAND_PARAMS_SIZE];
@@ -459,17 +469,15 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             // Reset parameter string iteration var
             cmdI = 0;
         } else {
-            // Selection commands
-            if (cmdI == 0 && string[i] == '[') {
+            // Selection commands: [R, C], [R1,C1,R2,C2], [_] and [_,_]
+            if (cmdI == 0 && string[i] == '[' && (isdigit(string[i + 1]) || string[i + 1] == '_')) {
                 // Skip the '[' char
                 i++;
 
-                // Classic selection
-                if (isdigit(string[i]) || string[i] == '_') {
-                    // Set a name (this type of commands doesn't have a name in input string)
-                    memcpy(cmd->name, "select", 7);
-                    paramI = 1;
-                }
+                // Set a type and a name (this type of commands doesn't have a name in input string)
+                cmd->type = SELECTION_COMMAND;
+                memcpy(cmd->name, "select", 7);
+                paramI = 1;
 
                 // Load parameters
                 while (string[i] != ']' && string[i] != ';') {
@@ -483,8 +491,11 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                         // cmd + 2: indexing from 0 and space for '\0'
                         // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                         char **param = &(cmd->strParams[paramI - 1]);
-                        if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
+                        char *tmp;
+                        if ((tmp = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                             return NULL;
+                        } else {
+                            *param = tmp;
                         }
 
                         // Save the char
@@ -504,17 +515,31 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                 continue;
             }
 
-            // Data processing commands
+            // Skip ']' char at the end of selection commands
+            if (string[i] == ']' && (string[i + 1] == ' ' || string[i + 1] == ';')) {
+                continue;
+            }
+
+            // Data processing commands and named selection commands ([min], [max], [find STR], [set])
             // Loading command name
             if (paramI == 0) {
+                // Skip '[' char at the start of selection commands and set command type
+                if (cmdI == 0 && string[i] == '[') {
+                    cmd->type = SELECTION_COMMAND;
+                    continue;
+                }
+
                 cmd->name[cmdI] = string[i];
             } else {
                 // Resize string parameters to cmd + 2 for the saving of the next char
                 // cmd + 2: indexing from 0 and space for '\0'
                 // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
                 char **param = &(cmd->strParams[paramI - 1]);
-                if ((*param = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
+                char *tmp;
+                if ((tmp = realloc(*param, sizeof(char) * (cmdI + 2))) == NULL) {
                     return NULL;
+                } else {
+                    *param = tmp;
                 }
 
                 // Save the char
@@ -1096,6 +1121,7 @@ Command *createCmd() {
     }
 
     // Set default values
+    cmd->type = CLASSIC_COMMAND;
     memset(cmd->name, '\0', COMMAND_NAME_SIZE + 1);
     memset(cmd->intParams, BAD_ROW_COL_NUMBER, sizeof(int) * COMMAND_PARAMS_SIZE);
     cmd->next = NULL;
@@ -1161,6 +1187,11 @@ void convertTypesInCommandParams(CommandSequence *cmdSeq) {
  * @param cmdSeq Command sequence to be destructed
  */
 void destructCommandSequence(CommandSequence *cmdSeq) {
+    // Command sequence has been already freed
+    if (cmdSeq == NULL) {
+        return;
+    }
+
     Command *cmd = cmdSeq->firstCmd;
     while (cmd != NULL) {
         // Backup next
@@ -1184,6 +1215,11 @@ void destructCommandSequence(CommandSequence *cmdSeq) {
  * @param cmd Command to be destructed
  */
 void destructCommand(Command *cmd) {
+    // Command sequence has been already freed
+    if (cmd == NULL) {
+        return;
+    }
+
     // Set static memory fields to empty states
     memset(cmd->name, '\0', COMMAND_NAME_SIZE);
     memset(cmd->intParams, 0, sizeof(int) * COMMAND_PARAMS_SIZE);
