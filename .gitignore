@@ -8,6 +8,7 @@ cmake-build-debug/
 input.txt
 output.txt
 tmp.txt
+valgrind.txt
 
 # C test files
 test.c
