@@ -1822,9 +1822,9 @@ ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
 /**
  * Insert column after selection
- * @param cmd Command that is applying
+ * @param cmd Command that is applying (not used)
  * @param table Table with data
- * @param sel Selection (not used)
+ * @param sel Selection
  * @param vars Temporary vars (not used)
  * @return Error information
  */
@@ -1832,11 +1832,22 @@ ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
 
     // Not used parameters
-    (void)sel;
+    (void)cmd;
     (void)vars;
 
-    (void)cmd;
-    (void)table;
+    // Create empty cell
+    Cell *cell;
+    if ((cell = createCell()) == NULL) {
+        err.error = true;
+        err.message = "Pri alokaci pameti pro novou bunku doslo k chybe.";
+
+        return err;
+    }
+
+    // Add column to the table
+    if ((err = addColumnToTable(table, cell, sel->colTo + 1)).error) {
+        return err;
+    }
 
     return err;
 }
