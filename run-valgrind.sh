@@ -1,0 +1,1 @@
+valgrind -s ./cmake-build-debug/sps_dev -d "$1" "$2" tmp.txt 2> valgrind.txt
