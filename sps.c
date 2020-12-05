@@ -1707,8 +1707,12 @@ ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    addRowToTable(table, row, sel->rowFrom - 1);
-    alignRowSizes(table);
+    if ((err = addRowToTable(table, row, sel->rowFrom - 1)).error) {
+        return err;
+    }
+    if ((err = alignRowSizes(table)).error) {
+        return err;
+    }
 
     return err;
 }
@@ -1738,8 +1742,12 @@ ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    addRowToTable(table, row, sel->rowTo);
-    alignRowSizes(table);
+    if ((err = addRowToTable(table, row, sel->rowTo)).error) {
+        return err;
+    }
+    if ((err = alignRowSizes(table)).error) {
+        return err;
+    }
 
     return err;
 }
