@@ -239,6 +239,7 @@ ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars)
 ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo countEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1331,11 +1332,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap", "sum", "avg", "count"
+            "clear", "swap", "sum", "avg", "count", "len"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit
+            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit, lenEdit
     };
 
     // Preparation of selection and variables
@@ -2114,6 +2115,44 @@ ErrorInfo countEdit(Command *cmd, Table *table, Selection *sel, Variables *vars)
         if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
             return err;
         }
+    }
+
+    return err;
+}
+
+/**
+ * Table editing function for counting length of selected cell and saving it to cell from input arguments
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
+
+    // Create aliases for better code readability
+    int argRow = cmd->intParams[0];
+    int argCol = cmd->intParams[1];
+
+    // Bad parameters
+    if (argRow < 1 || argCol < 1) {
+        err.error = true;
+        err.message = "Souradnice bunky musi byt vzdy ve tvaru [R,C], kde R i C jsou prirozena cisla.";
+
+        return err;
+    }
+
+    int result = (int)strlen(getCellValue(table, sel->curRow, sel->curCol));
+
+    // Save the result
+    char textResult[20];
+    sprintf(textResult, "%d", result);
+    if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
+        return err;
     }
 
     return err;
