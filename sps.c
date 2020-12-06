@@ -115,7 +115,7 @@ typedef struct cell {
  * @field capacity How many cells can be in the row
  */
 typedef struct row {
-    Cell *cells;
+    Cell **cells;
     unsigned int size;
     unsigned int capacity;
 } Row;
@@ -126,7 +126,7 @@ typedef struct row {
  * @field capacity How many cells can be in the row
  */
 typedef struct table {
-    Row *rows;
+    Row **rows;
     unsigned int size;
     unsigned int capacity;
 } Table;
@@ -645,8 +645,8 @@ void saveTableToFile(Table *table, FILE *file, char *delimiters) {
     char mainDelimiter = delimiters[0];
 
     for (unsigned i = 0; i < table->size; i++) {
-        for (unsigned j = 0; j < table->rows[i].size; j++) {
-            Cell *cell = &(table->rows[i].cells[j]);
+        for (unsigned j = 0; j < table->rows[i]->size; j++) {
+            Cell *cell = table->rows[i]->cells[j];
 
             // Check if borders for cell contains delimiter are required
             bool borders = false;
@@ -679,7 +679,7 @@ void saveTableToFile(Table *table, FILE *file, char *delimiters) {
             }
 
             // Add delimiter if not last
-            if (j + 1 < table->rows[i].size) {
+            if (j + 1 < table->rows[i]->size) {
                 fputc(mainDelimiter, file);
             }
         }
@@ -710,7 +710,7 @@ Table *createTable() {
     table->size = 0;
     table->capacity = TABLE_START_CAPACITY;
 
-    if ((table->rows = malloc(TABLE_START_CAPACITY * sizeof(Row))) == NULL) {
+    if ((table->rows = malloc(TABLE_START_CAPACITY * sizeof(Row *))) == NULL) {
         free(table);
         return NULL;
     }
@@ -731,7 +731,7 @@ Row *createRow() {
     row->size = 0;
     row->capacity = ROW_START_CAPACITY;
 
-    if ((row->cells = malloc(ROW_START_CAPACITY * sizeof(Cell))) == NULL) {
+    if ((row->cells = malloc(ROW_START_CAPACITY * sizeof(Cell *))) == NULL) {
         free(row);
         return NULL;
     }
@@ -777,7 +777,7 @@ ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
 
     // Resizing table if needed
     if (table->capacity < (table->size + 1)) {
-        if ((table->rows = realloc(table->rows, table->capacity * 2 * sizeof(Row))) == NULL) {
+        if ((table->rows = realloc(table->rows, table->capacity * 2 * sizeof(Row *))) == NULL) {
             err.error = true;
             err.message = "Nepodarilo se rozsirit pametovy prostor pro tabulku.";
 
@@ -793,11 +793,9 @@ ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
     }
 
     // Insert the row to the specified position
-    table->rows[position] = *row;
+    table->rows[position] = row;
     table->size++;
 
-    // Row has been inserted into table, the pointer won't be needed
-    free(row);
     return err;
 }
 
@@ -823,7 +821,7 @@ ErrorInfo addColumnToTable(Table *table, unsigned int position) {
             return err;
         }
 
-        if ((err = addCellToRow(&(table->rows[i]), cell, position + 1)).error) {
+        if ((err = addCellToRow(table->rows[i], cell, position + 1)).error) {
             return err;
         }
     }
@@ -846,7 +844,7 @@ ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
 
     // Resizing the row if needed
     if (row->capacity < (row->size + 1)) {
-        if ((row->cells = realloc(row->cells, row->capacity * 2 * sizeof(Cell))) == NULL) {
+        if ((row->cells = realloc(row->cells, row->capacity * 2 * sizeof(Cell *))) == NULL) {
             err.error = true;
             err.message = "Nepodarilo se rozsirit pametovy prostor pro radek.";
 
@@ -862,11 +860,9 @@ ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position) {
     }
 
     // Insert the cell to the specified position
-    row->cells[position] = *cell;
+    row->cells[position] = cell;
     row->size++;
 
-    // Cell has been inserted into row, the pointer won't be needed
-    free(cell);
     return err;
 }
 
@@ -917,9 +913,14 @@ ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position) {
  * @param position Position with the row to delete (1 = first)
  */
 void deleteRowFromTable(Table *table, unsigned int position) {
-    // Move rows to replace and fill the deleted position
     // There are coordinates from the real world in row and column (indexed from 1) --> - 1
-    for (unsigned i = (int)position - 1; i < table->size - 1; i++) {
+    position--;
+
+    // Destruct the row
+    destructRow(table->rows[position]);
+
+    // Move rows to replace and fill the deleted position
+    for (unsigned i = position; i < table->size - 1; i++) {
         table->rows[i] = table->rows[i + 1];
     }
 
@@ -938,13 +939,16 @@ void deleteColumnFromTable(Table *table, unsigned int columnNumber) {
 
     // Delete the cell on position columnNumber from every row of the table
     for (unsigned i = 0; i < table->size; i++) {
+        // Destruct the cell
+        destructCell(table->rows[i]->cells[columnNumber]);
+
         // Move cells to replace and fill the deleted position
-        for (unsigned j = (int)columnNumber; j < table->rows[i].size - 1; j++) {
-            table->rows[i].cells[j] = table->rows[i].cells[j + 1];
+        for (unsigned j = (int)columnNumber; j < table->rows[i]->size - 1; j++) {
+            table->rows[i]->cells[j] = table->rows[i]->cells[j + 1];
         }
 
         // The size has been changed
-        table->rows[i].size--;
+        table->rows[i]->size--;
     }
 }
 
@@ -959,14 +963,14 @@ ErrorInfo alignRowSizes(Table *table) {
     // Find number of cells in the biggest row (row with the most cells)
     unsigned biggestRow = 0;
     for (unsigned i = biggestRow + 1; i < table->size; i++) {
-        if (table->rows[i].size > table->rows[biggestRow].size) {
+        if (table->rows[i]->size > table->rows[biggestRow]->size) {
             biggestRow = i;
         }
     }
 
     // Set number of cells in each row by the row with the most cells
     for (unsigned i = 0; i < table->size; i++) {
-        for (unsigned j = table->rows[i].size; j < table->rows[biggestRow].size; j++) {
+        for (unsigned j = table->rows[i]->size; j < table->rows[biggestRow]->size; j++) {
             // Prepare empty cell
             Cell *cell;
             if ((cell = createCell()) == NULL) {
@@ -976,7 +980,7 @@ ErrorInfo alignRowSizes(Table *table) {
                 return err;
             }
 
-            if ((err = addCellToRow(&(table->rows[i]), cell, j + 1)).error) {
+            if ((err = addCellToRow(table->rows[i], cell, j + 1)).error) {
                 return err;
             }
         }
@@ -994,8 +998,8 @@ void trimRows(Table *table) {
     unsigned mostColumns = 0;
     for (unsigned i = 0; i < table->size; i++) {
         unsigned validColumns = 0;
-        for (unsigned j = 0; j < table->rows[i].size; j++) {
-            if (table->rows[i].cells[j].size != 0) {
+        for (unsigned j = 0; j < table->rows[i]->size; j++) {
+            if (table->rows[i]->cells[j]->size != 0) {
                 validColumns = j + 1;
             }
         }
@@ -1006,7 +1010,7 @@ void trimRows(Table *table) {
     }
 
     // Delete all unnecessary columns
-    for (unsigned j = table->rows[0].size; j > mostColumns; j--) {
+    for (unsigned j = table->rows[0]->size; j > mostColumns; j--) {
         deleteColumnFromTable(table, j + 1);
     }
 }
@@ -1023,7 +1027,7 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
     ErrorInfo err = {.error = false};
 
     // Add missing columns to the first row (it will be distributed automatically by calling alignRowSizes() function)
-    for (unsigned i = table->rows[0].size; i < columns; i++) {
+    for (unsigned i = table->rows[0]->size; i < columns; i++) {
         // Prepare the new cell
         Cell *cell;
         if ((cell = createCell()) == NULL) {
@@ -1034,7 +1038,7 @@ ErrorInfo resizeTable(Table *table, unsigned int rows, unsigned int columns) {
         }
 
         // Add the cell to the row
-        if ((err = addCellToRow(&(table->rows[0]), cell, i + 1)).error) {
+        if ((err = addCellToRow(table->rows[0], cell, i + 1)).error) {
             return err;
         }
     }
@@ -1073,7 +1077,7 @@ void destructTable(Table *table) {
     }
 
     for (unsigned i = 0; i < table->size; i++) {
-        destructRow(&(table->rows[i]));
+        destructRow(table->rows[i]);
     }
 
     free(table->rows);
@@ -1094,12 +1098,14 @@ void destructRow(Row *row) {
     }
 
     for (unsigned i = 0; i < row->size; i++) {
-        destructCell(&(row->cells[i]));
+        destructCell(row->cells[i]);
     }
 
     free(row->cells);
     row->capacity = 0;
     row->size = 0;
+
+    free(row);
 }
 
 /**
@@ -1114,6 +1120,8 @@ void destructCell(Cell *cell) {
 
     free(cell->data);
     cell->size = 0;
+
+    free(cell);
 }
 
 /**
@@ -1129,7 +1137,7 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
 
     // Get cell and new value's size for easier manipulation
     // There are coordinates from the real world in row and column (indexed from 1) --> - 1
-    Cell *cell = &(table->rows[row - 1].cells[column - 1]);
+    Cell *cell = table->rows[row - 1]->cells[column - 1];
     int newSize = (int)strlen(newValue);
 
     // Resize for the new value
@@ -1161,11 +1169,11 @@ char *getCellValue(Table *table, unsigned int row, unsigned int column) {
     row--;
     column--;
 
-    if (((table->size - 1) < row) || ((table->rows[0].size - 1) < column)) {
+    if (((table->size - 1) < row) || ((table->rows[0]->size - 1) < column)) {
         return NULL;
     }
 
-    return table->rows[row].cells[column].data;
+    return table->rows[row]->cells[column]->data;
 }
 
 /**
@@ -1558,15 +1566,15 @@ ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *
         } else {
             // R = '_'
             sel->colFrom = 1;
-            sel->colTo = table->rows[0].size;
+            sel->colTo = table->rows[0]->size;
         }
     }
 
     // Resize table if select is bigger than table size
     if (sel->rowTo > table->size) {
-        resizeTable(table, sel->rowTo, table->rows[0].size);
+        resizeTable(table, sel->rowTo, table->rows[0]->size);
     }
-    if (sel->colTo > table->rows[0].size) {
+    if (sel->colTo > table->rows[0]->size) {
         resizeTable(table, table->size, sel->colTo);
     }
 
@@ -1612,7 +1620,7 @@ ErrorInfo windowSelect(Command *cmd, Table *table, Selection *sel, Variables *va
     sel->rowFrom = row;
     sel->rowTo = (rowSecond != LAST_ROW_COL_NUMBER ? (unsigned)rowSecond : table->size);
     sel->colFrom = col;
-    sel->colTo = (colSecond != LAST_ROW_COL_NUMBER ? (unsigned)colSecond : table->rows[0].size);
+    sel->colTo = (colSecond != LAST_ROW_COL_NUMBER ? (unsigned)colSecond : table->rows[0]->size);
 
     return err;
 }
@@ -1959,14 +1967,24 @@ ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) 
         return err;
     }
 
+    char *tmp;
+    if ((tmp = malloc(sizeof(char) * (strlen(selCell) + 1))) == NULL) {
+        err.error = true;
+        err.message = "Pri alokaci pameti pro docasnou promennou doslo k chybe.";
+
+        return err;
+    }
+    memcpy(tmp, selCell, strlen(selCell) + 1);
+
     // Swap cells' values
     if ((err = setCellValue(table, sel->curRow, sel->curCol, argCell)).error) {
         return err;
     }
-    if ((err = setCellValue(table, (unsigned)argRow, (unsigned)argCol, selCell)).error) {
+    if ((err = setCellValue(table, (unsigned)argRow, (unsigned)argCol, tmp)).error) {
         return err;
     }
 
+    free(tmp);
     return err;
 }
 
