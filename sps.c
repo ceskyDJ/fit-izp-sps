@@ -526,7 +526,7 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             if ((cmd = createCmd()) == NULL) {
                 return NULL;
             }
-        } else if(string[i] == ' ') {
+        } else if(string[i] == ' ' && string[i - 1] != '\\') {
             // Move to the next parameter
             paramI++;
             // Reset parameter string iteration var
@@ -598,6 +598,11 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
 
                 cmd->name[cmdI] = string[i];
             } else {
+                // Skip escape char
+                if (string[i] == '\\' && string[i - 1] != '\\') {
+                    continue;
+                }
+
                 // Resize string parameters to cmd + 2 for the saving of the next char
                 // cmd + 2: indexing from 0 and space for '\0'
                 // [0] => name, [1] => firstParameter --> -1 (array with parameters start at index 0)
