@@ -528,10 +528,14 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
                 // Skip the '[' char
                 i++;
 
-                // Set a type and a name (this type of commands doesn't have a name in input string)
-                cmd->type = SELECTION_COMMAND;
-                memcpy(cmd->name, "select", 7);
-                paramI = 1;
+                // Set the name for selection commands
+                // Classic commands has already had name, so only process selection contains in its parameter
+                if (paramI == 0) {
+                    // Set a type and a name (this type of commands doesn't have a name in input string)
+                    cmd->type = SELECTION_COMMAND;
+                    memcpy(cmd->name, "select", 7);
+                    paramI = 1;
+                }
 
                 // Load parameters
                 while (string[i] != ']' && string[i] != ';') {
