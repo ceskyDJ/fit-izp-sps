@@ -160,12 +160,16 @@ typedef struct commandSequence {
  * @field rowTo Second row coordinate
  * @field colFrom First column coordinate
  * @field colTo Second column coordinate
+ * @field curRow Current row (for iterating over selection)
+ * @field curCol Current column (for iterating over selection)
  */
 typedef struct selection {
     unsigned int rowFrom;
     unsigned int rowTo;
     unsigned int colFrom;
     unsigned int colTo;
+    unsigned int curRow;
+    unsigned int curCol;
 } Selection;
 /**
  * @typedef Temporary variables _, _0 to _9
@@ -1367,8 +1371,12 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
             }
 
             // Other command are applied for every selected cell
-            for (unsigned j = sel->rowFrom; j <= sel->rowTo; j++) {
-                for (unsigned k = sel->colFrom; k <= sel->colTo; k++) {
+            for (unsigned i = sel->rowFrom; i <= sel->rowTo; i++) {
+                for (unsigned j = sel->colFrom; j <= sel->colTo; j++) {
+                    // Set current coords
+                    sel->curRow = i;
+                    sel->curCol = j;
+
                     if ((err = functions[found](cmd, table, sel, vars)).error) {
                         return err;
                     }
@@ -1721,7 +1729,7 @@ ErrorInfo irow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    if ((err = addRowToTable(table, row, sel->rowFrom)).error) {
+    if ((err = addRowToTable(table, row, sel->curRow)).error) {
         return err;
     }
     if ((err = alignRowSizes(table)).error) {
@@ -1756,7 +1764,7 @@ ErrorInfo arow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add the row into table
-    if ((err = addRowToTable(table, row, sel->rowTo + 1)).error) {
+    if ((err = addRowToTable(table, row, sel->curRow + 1)).error) {
         return err;
     }
     if ((err = alignRowSizes(table)).error) {
@@ -1782,7 +1790,7 @@ ErrorInfo drow(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     (void)vars;
 
     // Delete row
-    deleteRowFromTable(table, sel->rowFrom);
+    deleteRowFromTable(table, sel->curRow);
 
     return err;
 }
@@ -1812,7 +1820,7 @@ ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add column to the table
-    if ((err = addColumnToTable(table, cell, sel->colFrom)).error) {
+    if ((err = addColumnToTable(table, cell, sel->curCol)).error) {
         return err;
     }
 
@@ -1844,7 +1852,7 @@ ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     }
 
     // Add column to the table
-    if ((err = addColumnToTable(table, cell, sel->colTo + 1)).error) {
+    if ((err = addColumnToTable(table, cell, sel->curCol + 1)).error) {
         return err;
     }
 
@@ -1867,7 +1875,7 @@ ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     (void)vars;
 
     // Delete column
-    deleteColumnFromTable(table, sel->colFrom);
+    deleteColumnFromTable(table, sel->curCol);
 
     return err;
 }
