@@ -511,8 +511,6 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
         return NULL;
     }
 
-    // TODO: add border chars support for text parameters
-
     // Parse string to commands
     unsigned i, cmdI, paramI;
     for (i = cmdI = paramI = 0; i < strlen(string); i++) {
