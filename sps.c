@@ -237,6 +237,7 @@ ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo sumEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1329,11 +1330,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap"
+            "clear", "swap", "sum"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit
+            clearEdit, swapEdit, sumEdit
     };
 
     // Preparation of selection and variables
@@ -1984,6 +1985,68 @@ ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) 
         return err;
     }
     if ((err = setCellValue(table, (unsigned)argRow, (unsigned)argCol, selCell)).error) {
+        return err;
+    }
+
+    return err;
+}
+
+/**
+ * Table editing function for counting a sum of selection and saving it to cell selected in input arguments
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo sumEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
+
+    // Create aliases for better code readability
+    int argRow = cmd->intParams[0];
+    int argCol = cmd->intParams[1];
+
+    // Bad parameters
+    if (argRow < 1 || argCol < 1) {
+        err.error = true;
+        err.message = "Souradnice bunky musi byt vzdy ve tvaru [R,C], kde R i C jsou prirozena cisla.";
+
+        return err;
+    }
+
+    // First iteration --> set value of the cell to store the result to 0
+    if (sel->curRow == sel->rowFrom && sel->curCol == sel->colFrom) {
+        if ((err = setCellValue(table, argRow, argCol, "0")).error) {
+            return err;
+        }
+    }
+
+    // Actual selection cell value
+    char *selCell = getCellValue(table, sel->curRow, sel->curCol);
+
+    // This selection cell is not numeric --> cannot be added to the sum
+    if (!isValidNumber(selCell)) {
+        return err;
+    }
+
+    // Actual arguments cell value
+    char *argCell;
+    if ((argCell = getCellValue(table, argRow, argCol)) == NULL) {
+        err.error = true;
+        err.message = "Funkce swap vyzaduje vyber takove bunky, ktera je v tabulce obsazena.";
+
+        return err;
+    }
+
+    // Add value of selection cell to the sum and save the result
+    double result = strtod(selCell, NULL) + strtod(argCell, NULL);
+    char textResult[50];
+    sprintf(textResult, "%g", result);
+
+    if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
         return err;
     }
 
