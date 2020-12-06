@@ -1256,7 +1256,7 @@ void convertTypesInCommandParams(CommandSequence *cmdSeq) {
     while (cmd != NULL) {
         for (unsigned i = 0; i < COMMAND_PARAMS_SIZE; i++) {
             int value;
-            if (streq(cmd->strParams[i], "_")) {
+            if (streq(cmd->strParams[i], "_") || streq(cmd->strParams[i], "-")) {
                 cmd->intParams[i] = LAST_ROW_COL_NUMBER;
             } else if ((value = (int)strtol(cmd->strParams[i], NULL, 10)) != 0) {
                 cmd->intParams[i] = value;
