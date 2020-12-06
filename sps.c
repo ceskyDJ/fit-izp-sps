@@ -217,7 +217,7 @@ void destructCommand(Command *cmd);
 ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table);
 // Functions for working with selection
 Selection *createSelection();
-void revertSelectionFromBackup(Selection *sel, Selection *backup);
+void updateSelectionBySelection(Selection *sel, Selection *pattern);
 void destructSelection(Selection *sel);
 // Functions for working with temporary variables
 Variables *createVars();
@@ -240,6 +240,8 @@ ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo countEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+// Variable using functions
+ErrorInfo setVars(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -577,7 +579,7 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             }
 
             // Skip ']' char at the end of selection commands
-            if (string[i] == ']' && (string[i + 1] == ' ' || string[i + 1] == ';')) {
+            if (string[i] == ']' && (string[i + 1] == ' ' || string[i + 1] == ';' || string[i + 1] == '\0')) {
                 continue;
             }
 
@@ -611,6 +613,11 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
             // Increment command name/parameter string iteration var
             cmdI++;
         }
+    }
+
+    // There are two set commands, so we need to differ them
+    if (streq(cmd->name, "set") && cmd->type == SELECTION_COMMAND) {
+        memcpy(cmd->name, "set-v", 5 * sizeof(char));
     }
 
     // Close the last command
@@ -1332,11 +1339,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap", "sum", "avg", "count", "len"
+            "clear", "swap", "sum", "avg", "count", "len", "set-v"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit, lenEdit
+            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit, lenEdit, setVars
     };
 
     // Preparation of selection and variables
@@ -1362,7 +1369,7 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
         // Find related function
         int found = -1;
         for (unsigned i = 0; i < sizeof(names) / sizeof(char *); i++) {
-            if (strstr(names[i], cmd->name)) {
+            if (streq(names[i], cmd->name)) {
                 found = (int)i;
                 break;
             }
@@ -1436,15 +1443,15 @@ Selection *createSelection() {
 }
 
 /**
- * Reverts selection from backup
- * @param sel Selection to revert
- * @param backup Backup - selection with values to revert
+ * Updates selection data by data from another selection
+ * @param sel Selection to change
+ * @param pattern Selection to get data from
  */
-void revertSelectionFromBackup(Selection *sel, Selection *backup) {
-    sel->rowFrom = backup->rowFrom;
-    sel->rowTo = backup->rowTo;
-    sel->colFrom = backup->colFrom;
-    sel->colTo = backup->colTo;
+void updateSelectionBySelection(Selection *sel, Selection *pattern) {
+    sel->rowFrom = pattern->rowFrom;
+    sel->rowTo = pattern->rowTo;
+    sel->colFrom = pattern->colFrom;
+    sel->colTo = pattern->colTo;
 }
 
 /**
@@ -1471,7 +1478,10 @@ Variables *createVars() {
     }
 
     // Data default values
-    vars->sel = NULL;
+    if ((vars->sel = malloc(sizeof(Selection))) == NULL) {
+        return NULL;
+    }
+
     for (unsigned i = 0; i < NUMBER_OF_VARIABLES; i++) {
         if ((vars->data[i] = malloc(sizeof(char))) == NULL) {
             return NULL;
@@ -1522,14 +1532,15 @@ ErrorInfo standardSelect(Command *cmd, Table *table, Selection *sel, Variables *
     // [_]
     if (row == LAST_ROW_COL_NUMBER && col == BAD_ROW_COL_NUMBER) {
         // Selection hasn't been saved yet
-        if (vars->sel == NULL) {
+        if (vars->sel->rowFrom == 0) {
             err.error = true;
             err.message = "Vyber z docastne promenne neni mozne nacist, protoze promenna zadny vyber neobsahuje.";
 
             return err;
         }
 
-        revertSelectionFromBackup(sel, vars->sel);
+        // Revert selection from backup
+        updateSelectionBySelection(sel, vars->sel);
 
         return err;
     }
@@ -2154,6 +2165,27 @@ ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
         return err;
     }
+
+    return err;
+}
+
+/**
+ * Variable using function for saving a backup of actual selection
+ * @param cmd Command that is applying (not used)
+ * @param table Table with data (not used)
+ * @param sel Selection
+ * @param vars Temporary vars
+ * @return Error information
+ */
+ErrorInfo setVars(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)cmd;
+    (void)table;
+
+    // Backup actual selection
+    updateSelectionBySelection(vars->sel, sel);
 
     return err;
 }
