@@ -615,11 +615,6 @@ CommandSequence *loadCommandsFromString(const char *string, signed char *flag) {
         }
     }
 
-    // There are two set commands, so we need to differ them
-    if (streq(cmd->name, "set") && cmd->type == SELECTION_COMMAND) {
-        memcpy(cmd->name, "set-v", 5 * sizeof(char));
-    }
-
     // Close the last command
     addNewCmdToSeq(cmdSeq, cmd);
 
@@ -1238,6 +1233,11 @@ Command *createCmd() {
  * @param cmd New command to add
  */
 void addNewCmdToSeq(CommandSequence *cmdSeq, Command *cmd) {
+    // There are two set commands, so we need to differ them
+    if (streq(cmd->name, "set") && cmd->type == SELECTION_COMMAND) {
+        memcpy(cmd->name, "set-v", 5 * sizeof(char));
+    }
+
     // Behaviour is different for the first command
     if (cmdSeq->firstCmd == NULL) {
         cmdSeq->firstCmd = cmd;
