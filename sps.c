@@ -1374,14 +1374,6 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
                 return err;
             }
         } else {
-            // Other commands must be called after selection
-            if (sel->rowFrom == 0) {
-                err.error = true;
-                err.message = "Pred volanim editacnich prikazu je nutne nejprve provest vyber.";
-
-                return err;
-            }
-
             // Other command are applied for every selected cell
             for (unsigned i = sel->rowFrom; i <= sel->rowTo; i++) {
                 for (unsigned j = sel->colFrom; j <= sel->colTo; j++) {
@@ -1418,10 +1410,10 @@ Selection *createSelection() {
     }
 
     // Set data to default values
-    sel->rowFrom = 0;
-    sel->rowTo = 0;
-    sel->colFrom = 0;
-    sel->colTo = 0;
+    sel->rowFrom = 1;
+    sel->rowTo = 1;
+    sel->colFrom = 1;
+    sel->colTo = 1;
     sel->curRow = 0;
     sel->curCol = 0;
 
