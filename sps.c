@@ -238,6 +238,7 @@ ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo countEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1330,11 +1331,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap", "sum", "avg"
+            "clear", "swap", "sum", "avg", "count"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit
+            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit
     };
 
     // Preparation of selection and variables
@@ -2055,6 +2056,64 @@ ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars
     sprintf(textResult, "%g", result);
     if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
         return err;
+    }
+
+    return err;
+}
+
+/**
+ * Table editing function for counting number of non-empty cells in selection and saving it to cell from arguments
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo countEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
+
+    // Create aliases for better code readability
+    int argRow = cmd->intParams[0];
+    int argCol = cmd->intParams[1];
+
+    // Bad parameters
+    if (argRow < 1 || argCol < 1) {
+        err.error = true;
+        err.message = "Souradnice bunky musi byt vzdy ve tvaru [R,C], kde R i C jsou prirozena cisla.";
+
+        return err;
+    }
+
+    // First iteration --> set value of the cell to store the result to 0
+    if (sel->curRow == sel->rowFrom && sel->curCol == sel->colFrom) {
+        if ((err = setCellValue(table, argRow, argCol, "0")).error) {
+            return err;
+        }
+    }
+
+    // If selection cell has non-empty value, increment value of cell with result
+    if (!streq(getCellValue(table, sel->curRow, sel->curCol), "")) {
+        // Actual arguments cell value
+        char *argCell;
+        if ((argCell = getCellValue(table, argRow, argCol)) == NULL) {
+            err.error = true;
+            err.message = "Funkce swap vyzaduje vyber takove bunky, ktera je v tabulce obsazena.";
+
+            return err;
+        }
+
+        // Increment the value
+        int result = (int)strtol(argCell, NULL, 10) + 1;
+
+        // Save the result
+        char textResult[20];
+        sprintf(textResult, "%d", result);
+        if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
+            return err;
+        }
     }
 
     return err;
