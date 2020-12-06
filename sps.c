@@ -192,9 +192,8 @@ void writeErrorMessage(const char *message);
 Table *createTable();
 Row *createRow();
 Cell *createCell();
-Cell *copyCell(const Cell *sourceCell);
 ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position);
-ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position);
+ErrorInfo addColumnToTable(Table *table, unsigned int position);
 ErrorInfo addCellToRow(Row *row, Cell *cell, unsigned int position);
 ErrorInfo addCharToCell(Cell *cell, char c, unsigned int position);
 void deleteRowFromTable(Table *table, unsigned int position);
@@ -759,30 +758,6 @@ Cell *createCell() {
 }
 
 /**
- * Makes a copy of the cell
- * @param sourceCell Source cell to copy
- * @return Deep copy of the provided cell or NULL if error occurred
- */
-Cell *copyCell(const Cell *sourceCell) {
-    Cell *cell;
-    if ((cell = createCell()) == NULL) {
-        return NULL;
-    }
-
-    cell->capacity = sourceCell->capacity;
-    cell->size = sourceCell->size;
-
-    // The last '\0' --> + 1
-    if ((cell->data = malloc((cell->capacity + 1) * sizeof(char))) == NULL) {
-        free(cell);
-        return NULL;
-    }
-    memcpy(cell->data, sourceCell->data, cell->capacity + 1);
-
-    return cell;
-}
-
-/**
  * Adds a row to a table
  * @param table Table to edit
  * @param row Row to add to the table
@@ -822,13 +797,12 @@ ErrorInfo addRowToTable(Table *table, Row *row, unsigned int position) {
 }
 
 /**
- * Adds a column to the table (inserts cell with the same data to all of the rows)
+ * Adds a column to the table (inserts empty cell to all of the rows)
  * @param table Table to edit
- * @param cell Cell to insert
  * @param position Position in the table (1 = first)
  * @return Error information
  */
-ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
+ErrorInfo addColumnToTable(Table *table, unsigned int position) {
     ErrorInfo err = {.error = false};
 
     // There are coordinates from the real world in row and column (indexed from 1) --> - 1
@@ -836,15 +810,19 @@ ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
 
     // Add cell to every row at specified position
     for (unsigned i = 0; i < table->size; i++) {
-        Cell *cellCopy = copyCell(cell);
-        if ((err = addCellToRow(&(table->rows[i]), cellCopy, position + 1)).error) {
+        Cell *cell;
+        if ((cell = createCell()) == NULL) {
+            err.error = true;
+            err.message = "Nepodarilo se alokovat pamet pro novou bunku.";
+
+            return err;
+        }
+
+        if ((err = addCellToRow(&(table->rows[i]), cell, position + 1)).error) {
             return err;
         }
     }
 
-    // Cell has been inserted into table, the pointer won't be needed
-    destructCell(cell);
-    free(cell);
     return err;
 }
 
@@ -1851,17 +1829,8 @@ ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     (void)cmd;
     (void)vars;
 
-    // Create empty cell
-    Cell *cell;
-    if ((cell = createCell()) == NULL) {
-        err.error = true;
-        err.message = "Pri alokaci pameti pro novou bunku doslo k chybe.";
-
-        return err;
-    }
-
     // Add column to the table
-    if ((err = addColumnToTable(table, cell, sel->curCol)).error) {
+    if ((err = addColumnToTable(table, sel->curCol)).error) {
         return err;
     }
 
@@ -1883,17 +1852,8 @@ ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     (void)cmd;
     (void)vars;
 
-    // Create empty cell
-    Cell *cell;
-    if ((cell = createCell()) == NULL) {
-        err.error = true;
-        err.message = "Pri alokaci pameti pro novou bunku doslo k chybe.";
-
-        return err;
-    }
-
     // Add column to the table
-    if ((err = addColumnToTable(table, cell, sel->curCol + 1)).error) {
+    if ((err = addColumnToTable(table, sel->curCol + 1)).error) {
         return err;
     }
 
