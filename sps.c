@@ -843,6 +843,7 @@ ErrorInfo addColumnToTable(Table *table, Cell *cell, unsigned int position) {
     }
 
     // Cell has been inserted into table, the pointer won't be needed
+    destructCell(cell);
     free(cell);
     return err;
 }
