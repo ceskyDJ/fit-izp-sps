@@ -172,13 +172,15 @@ typedef struct selection {
     unsigned int curCol;
 } Selection;
 /**
- * @typedef Temporary variables _, _0 to _9
+ * @typedef Temporary variables
  * @field sel Selection variable (_)
  * @field data Data variables (_0 to _9)
+ * @field number Program internal variable for storing number between iterations
  */
 typedef struct variables {
     Selection *sel;
     char *data[NUMBER_OF_VARIABLES];
+    double number;
 } Variables;
 
 // Input/output functions
@@ -1978,14 +1980,11 @@ ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) 
  * @param cmd Command that is applying
  * @param table Table with data
  * @param sel Selection
- * @param vars Temporary vars (not used)
+ * @param vars Temporary vars
  * @return Error information
  */
 ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
-
-    // Not used parameters
-    (void)vars;
 
     // Create aliases for better code readability
     int argRow = cmd->intParams[0];
@@ -1999,11 +1998,9 @@ ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars
         return err;
     }
 
-    // First iteration --> set value of the cell to store the result to 0
+    // First iteration --> prepare temp variable
     if (sel->curRow == sel->rowFrom && sel->curCol == sel->colFrom) {
-        if ((err = setCellValue(table, argRow, argCol, "0")).error) {
-            return err;
-        }
+        vars->number = 0.0;
     }
 
     // Actual selection cell value
@@ -2014,29 +2011,22 @@ ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars
         return err;
     }
 
-    // Actual arguments cell value
-    char *argCell;
-    if ((argCell = getCellValue(table, argRow, argCol)) == NULL) {
-        err.error = true;
-        err.message = "Funkce swap vyzaduje vyber takove bunky, ktera je v tabulce obsazena.";
+    // Add value of selection cell to the temp variable
+    vars->number += strtod(selCell, NULL);
 
-        return err;
-    }
-
-    // Add value of selection cell to the sum
-    double result = strtod(selCell, NULL) + strtod(argCell, NULL);
-
-    // The last iteration --> count average
+    // The last iteration
     if (sel->curRow == sel->rowTo && sel->curCol == sel->colTo) {
-        // Summary divided by number of iterations (number of items)
-        result = result / ((sel->rowTo - sel->rowFrom + 1) * (sel->colTo - sel->colFrom + 1));
-    }
+        // Count average (= summary divided by number of iterations (number of items))
+        if (streq(cmd->name, "avg")) {
+            vars->number = vars->number / ((sel->rowTo - sel->rowFrom + 1) * (sel->colTo - sel->colFrom + 1));
+        }
 
-    // Save the result
-    char textResult[50];
-    sprintf(textResult, "%g", result);
-    if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
-        return err;
+        // Save the result
+        char textResult[50];
+        sprintf(textResult, "%g", vars->number);
+        if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
+            return err;
+        }
     }
 
     return err;
