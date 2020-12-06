@@ -1509,6 +1509,9 @@ void destructVars(Variables *vars) {
         return;
     }
 
+    // Deallocate selection variable
+    free(vars->sel);
+
     // Deallocate each data variable
     for (unsigned i = 0; i < NUMBER_OF_VARIABLES; i++) {
         free(vars->data[i]);
