@@ -236,6 +236,7 @@ ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1161,7 +1162,14 @@ ErrorInfo setCellValue(Table *table, unsigned int row, unsigned int column, cons
  */
 char *getCellValue(Table *table, unsigned int row, unsigned int column) {
     // There are coordinates from the real world in row and column (indexed from 1) --> - 1
-    return table->rows[row - 1].cells[column - 1].data;
+    row--;
+    column--;
+
+    if (((table->size - 1) < row) || ((table->rows[0].size - 1) < column)) {
+        return NULL;
+    }
+
+    return table->rows[row].cells[column].data;
 }
 
 /**
@@ -1317,11 +1325,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear"
+            "clear", "swap"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit
+            clearEdit, swapEdit
     };
 
     // Preparation of selection and variables
@@ -1925,6 +1933,53 @@ ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars)
 
     // Set the new value to the selected cell
     if ((err = setCellValue(table, sel->curRow, sel->curCol, "")).error) {
+        return err;
+    }
+
+    return err;
+}
+
+/**
+ * Table editing function for swapping a value of selected cell with cell selected by input arguments
+ * @param cmd Command that is applying
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)vars;
+
+    // Create aliases for better code readability
+    int argRow = cmd->intParams[0];
+    int argCol = cmd->intParams[1];
+
+    // Bad parameters
+    if (argRow < 1 || argCol < 1) {
+        err.error = true;
+        err.message = "Souradnice bunky musi byt vzdy ve tvaru [R,C], kde R i C jsou prirozena cisla.";
+
+        return err;
+    }
+
+    // Get values of both cells
+    char *selCell = getCellValue(table, sel->curRow, sel->curCol);
+    char *argCell;
+    if ((argCell = getCellValue(table, argRow, argCol)) == NULL) {
+        err.error = true;
+        err.message = "Funkce swap vyzaduje vyber takove bunky, ktera je v tabulce obsazena.";
+
+        return err;
+    }
+
+    // Swap cells' values
+    if ((err = setCellValue(table, sel->curRow, sel->curCol, argCell)).error) {
+        return err;
+    }
+    if ((err = setCellValue(table, (unsigned)argRow, (unsigned)argCol, selCell)).error) {
         return err;
     }
 
