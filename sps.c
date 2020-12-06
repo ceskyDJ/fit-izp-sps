@@ -237,7 +237,7 @@ ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
-ErrorInfo sumEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1330,11 +1330,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap", "sum"
+            "clear", "swap", "sum", "avg"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit, sumEdit
+            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit
     };
 
     // Preparation of selection and variables
@@ -1992,14 +1992,14 @@ ErrorInfo swapEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) 
 }
 
 /**
- * Table editing function for counting a sum of selection and saving it to cell selected in input arguments
+ * Table editing function for counting a sum/average of selection and saving it to cell selected in input arguments
  * @param cmd Command that is applying
  * @param table Table with data
  * @param sel Selection
  * @param vars Temporary vars (not used)
  * @return Error information
  */
-ErrorInfo sumEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+ErrorInfo sumAvgEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     ErrorInfo err = {.error = false};
 
     // Not used parameters
@@ -2041,11 +2041,18 @@ ErrorInfo sumEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
         return err;
     }
 
-    // Add value of selection cell to the sum and save the result
+    // Add value of selection cell to the sum
     double result = strtod(selCell, NULL) + strtod(argCell, NULL);
+
+    // The last iteration --> count average
+    if (sel->curRow == sel->rowTo && sel->curCol == sel->colTo) {
+        // Summary divided by number of iterations (number of items)
+        result = result / ((sel->rowTo - sel->rowFrom + 1) * (sel->colTo - sel->colFrom + 1));
+    }
+
+    // Save the result
     char textResult[50];
     sprintf(textResult, "%g", result);
-
     if ((err = setCellValue(table, argRow, argCol, textResult)).error) {
         return err;
     }
