@@ -360,6 +360,7 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
+/***********************************************************************************************Input/output functions*/
 /**
  * Constructs table with data from a file
  * @param fileName Name of the input file
@@ -697,6 +698,7 @@ void writeErrorMessage(const char *message) {
     fprintf(stderr, "sps: %s\n", message);
 }
 
+/******************************************************************Functions for working with table and its components*/
 /**
  * Creates a new table
  * @return Pointer to the new table or NULL if error occurred
@@ -1176,6 +1178,7 @@ char *getCellValue(Table *table, unsigned int row, unsigned int column) {
     return table->rows[row]->cells[column]->data;
 }
 
+/**********************************************************************************Functions for working with commands*/
 /**
  * Creates command sequence
  * @return Pointer to the newly created command sequence
@@ -1410,6 +1413,7 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     return err;
 }
 
+/*********************************************************************************Functions for working with selection*/
 /**
  * Creates a new selection
  * @return Pointer to the new selection or NULL if memory problems occurred
@@ -1456,6 +1460,7 @@ void destructSelection(Selection *sel) {
     free(sel);
 }
 
+/***********************************************************************Functions for working with temporary variables*/
 /**
  * Creates a new variables
  * @return Pointer to the new variables or NULL if memory problems occurred
@@ -1504,6 +1509,7 @@ void destructVars(Variables *vars) {
     free(vars);
 }
 
+/****************************************************************Selection functions (implementations of the commands)*/
 /**
  * Applies standard select ([R,C] and its subtypes)
  * @param cmd Command that is applying
@@ -1728,6 +1734,7 @@ ErrorInfo findSelect(Command *cmd, Table *table, Selection *sel, Variables *vars
     return err;
 }
 
+/********************************************************Data manipulation functions (implementations of the commands)*/
 /**
  * Inserts row before selected row
  * @param cmd Command that is applying
@@ -2141,6 +2148,7 @@ ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     return err;
 }
 
+/*********************************************************************************************Variable using functions*/
 /**
  * Variable using function for saving a value to the variable
  * @param cmd Command that is applying
@@ -2279,6 +2287,7 @@ ErrorInfo setVars(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     return err;
 }
 
+/*******************************************************************************************************Help functions*/
 /**
  * Checks if the string contains valid number
  * @param number String for testing
