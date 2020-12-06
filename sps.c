@@ -691,7 +691,7 @@ void saveTableToFile(Table *table, FILE *file, char *delimiters) {
  * @param message Error message
  */
 void writeErrorMessage(const char *message) {
-    fprintf(stderr, "sps: %s", message);
+    fprintf(stderr, "sps: %s\n", message);
 }
 
 /**
