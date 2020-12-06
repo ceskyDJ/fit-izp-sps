@@ -1438,6 +1438,8 @@ Selection *createSelection() {
     sel->rowTo = 0;
     sel->colFrom = 0;
     sel->colTo = 0;
+    sel->curRow = 0;
+    sel->curCol = 0;
 
     return sel;
 }
