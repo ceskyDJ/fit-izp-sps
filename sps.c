@@ -235,6 +235,7 @@ ErrorInfo icol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo acol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo dcol(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
 
@@ -1314,9 +1315,13 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     ErrorInfo err = {.error = false};
 
     // Functions known by the system
-    char *names[] = {"select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set"};
+    char *names[] = {
+            "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
+            "clear"
+    };
     ErrorInfo (*functions[])() = {
-            standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit
+            standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
+            clearEdit
     };
 
     // Preparation of selection and variables
@@ -1897,6 +1902,29 @@ ErrorInfo setEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
 
     // Set the new value to the selected cell
     if ((err = setCellValue(table, sel->curRow, sel->curCol, cmd->strParams[0])).error) {
+        return err;
+    }
+
+    return err;
+}
+
+/**
+ * Table editing function for clearing (deleting value) from selected cell
+ * @param cmd Command that is applying (not used)
+ * @param table Table with data
+ * @param sel Selection
+ * @param vars Temporary vars (not used)
+ * @return Error information
+ */
+ErrorInfo clearEdit(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)cmd;
+    (void)vars;
+
+    // Set the new value to the selected cell
+    if ((err = setCellValue(table, sel->curRow, sel->curCol, "")).error) {
         return err;
     }
 
