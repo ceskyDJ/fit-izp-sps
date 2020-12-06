@@ -1343,6 +1343,14 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
             }
         }
 
+        // Commands isn't implemented
+        if (found < 0) {
+            err.error = true;
+            err.message = "Byl zadan prikaz, ktery neni definovan.";
+
+            return err;
+        }
+
         // Apply command by its type
         if (cmd->type == SELECTION_COMMAND) {
             // Selection commands are applied everytime once
@@ -1366,14 +1374,6 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
                     }
                 }
             }
-        }
-
-        // Commands isn't implemented
-        if (found < 0) {
-            err.error = true;
-            err.message = "Byl zadan prikaz, ktery neni definovan.";
-
-            return err;
         }
 
         // Move to the next command in sequence
