@@ -243,6 +243,7 @@ ErrorInfo lenEdit(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Variable using functions
 ErrorInfo defVars(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo useVars(Command *cmd, Table *table, Selection *sel, Variables *vars);
+ErrorInfo incVars(Command *cmd, Table *table, Selection *sel, Variables *vars);
 ErrorInfo setVars(Command *cmd, Table *table, Selection *sel, Variables *vars);
 // Help functions
 bool isValidNumber(char *number);
@@ -1341,11 +1342,11 @@ ErrorInfo processCommands(CommandSequence *cmdSeq, Table *table) {
     // Functions known by the system
     char *names[] = {
             "select", "min", "max", "find", "irow", "arow", "drow", "icol", "acol", "dcol", "set",
-            "clear", "swap", "sum", "avg", "count", "len", "def", "use", "set-v"
+            "clear", "swap", "sum", "avg", "count", "len", "def", "use", "inc", "set-v"
     };
     ErrorInfo (*functions[])() = {
             standardSelect, minMaxSelect, minMaxSelect, findSelect, irow, arow, drow, icol, acol, dcol, setEdit,
-            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit, lenEdit, defVars, useVars, setVars
+            clearEdit, swapEdit, sumAvgEdit, sumAvgEdit, countEdit, lenEdit, defVars, useVars, incVars, setVars
     };
 
     // Preparation of selection and variables
@@ -2240,6 +2241,52 @@ ErrorInfo useVars(Command *cmd, Table *table, Selection *sel, Variables *vars) {
     if ((err = setCellValue(table, sel->curRow, sel->curCol, value)).error) {
         return err;
     }
+
+    return err;
+}
+
+/**
+ * Variable using function for incrementing value of variable
+ * @param cmd Command that is applying
+ * @param table Table with data (not used)
+ * @param sel Selection (not used)
+ * @param vars Temporary vars
+ * @return Error information
+ */
+ErrorInfo incVars(Command *cmd, Table *table, Selection *sel, Variables *vars) {
+    ErrorInfo err = {.error = false};
+
+    // Not used parameters
+    (void)table;
+    (void)sel;
+
+    // Bad parameters
+    if (cmd->strParams[0][0] != '_' || !isdigit(cmd->strParams[0][1]) || cmd->strParams[0][2] != '\0') {
+        err.error = true;
+        err.message = "Je mozne vyuzit pouze promennych s oznacenim _0 az _9.";
+
+        return err;
+    }
+
+    // Get var number from params
+    int varNumber = (int)cmd->strParams[0][1] - '0';
+
+    // Get incremented value
+    double value = strtod(vars->data[varNumber], NULL) + 1.0;
+
+    // Convert value to text form
+    char textValue[50];
+    sprintf(textValue, "%g", value);
+
+    // Save changed value to the var
+    if ((vars->data[varNumber] = realloc(vars->data[varNumber], strlen(textValue) + 1)) == NULL) {
+        err.error = true;
+        err.message = "Pri alokaci pameti pro data promenne doslo k chybe.";
+
+        return err;
+    }
+    memset(vars->data[varNumber], '\0', strlen(textValue) + 1);
+    memcpy(vars->data[varNumber], textValue, strlen(textValue));
 
     return err;
 }
